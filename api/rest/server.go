@@ -67,7 +67,18 @@ func (s *Server) Start() error {
 		}
 	}
 
-	return listenFunc()
+	err := listenFunc()
+	if err != nil {
+		if err == http.ErrServerClosed {
+			return nil
+		}
+	}
+
+	return err
+}
+
+func (s *Server) Stop() error {
+	return s.core.Close()
 }
 
 func (s *Server) AddHandler(pattern string, handler func(http.ResponseWriter, *http.Request)) *mux.Route {
