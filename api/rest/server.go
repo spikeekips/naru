@@ -46,6 +46,7 @@ func NewServer(bind *sebakcommon.Endpoint) *Server {
 		router: mux.NewRouter(),
 	}
 
+	server.router.Use(FlushWriterMiddleware())
 	core.Handler = HTTP2Log15Handler{log: httpLog, handler: server.router}
 
 	return server

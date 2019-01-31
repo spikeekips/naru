@@ -22,6 +22,7 @@ type HTTP2Client struct {
 	client    http.Client
 	transport *http.Transport
 	headers   http.Header
+	keepAlive bool
 }
 
 func NewHTTP2Client(timeout time.Duration, url *url.URL, keepAlive bool, headers http.Header) (http2Client *HTTP2Client, err error) {
@@ -54,26 +55,27 @@ func NewHTTP2Client(timeout time.Duration, url *url.URL, keepAlive bool, headers
 		client:    client,
 		transport: transport,
 		headers:   headers,
+		keepAlive: keepAlive,
 	}
 
 	return
 }
 
-func (client *HTTP2Client) URL() *url.URL {
-	return client.url
+func (cl *HTTP2Client) URL() *url.URL {
+	return cl.url
 }
 
-func (client *HTTP2Client) Transport() *http.Transport {
-	return client.transport
+func (cl *HTTP2Client) Transport() *http.Transport {
+	return cl.transport
 }
 
-func (client *HTTP2Client) resolvePath(path string) *url.URL {
-	return client.url.ResolveReference(&url.URL{Path: path})
+func (cl *HTTP2Client) resolvePath(path string) *url.URL {
+	return cl.url.ResolveReference(&url.URL{Path: path})
 }
 
-func (client *HTTP2Client) newHeaders(headers http.Header) http.Header {
+func (cl *HTTP2Client) newHeaders(headers http.Header) http.Header {
 	newHeaders := http.Header{}
-	for k, v := range client.headers {
+	for k, v := range cl.headers {
 		newHeaders[k] = v
 	}
 
@@ -86,8 +88,8 @@ func (client *HTTP2Client) newHeaders(headers http.Header) http.Header {
 	return newHeaders
 }
 
-func (client *HTTP2Client) request(method, path string, body io.Reader, headers http.Header) (response *http.Response, err error) {
-	u := client.resolvePath(path)
+func (cl *HTTP2Client) request(method, path string, body io.Reader, headers http.Header) (response *http.Response, err error) {
+	u := cl.resolvePath(path)
 
 	var r *http.Request
 	if r, err = http.NewRequest(method, u.String(), body); err != nil {
@@ -97,21 +99,21 @@ func (client *HTTP2Client) request(method, path string, body io.Reader, headers 
 		r.Close = true
 	}()
 
-	r.Header = client.newHeaders(headers)
+	r.Header = cl.newHeaders(headers)
 
-	if client.timeout > 0 {
-		ctx, _ := context.WithTimeout(context.TODO(), client.timeout)
+	if cl.timeout > 0 {
+		ctx, _ := context.WithTimeout(context.TODO(), cl.timeout)
 		r = r.WithContext(ctx)
 	}
 
-	response, err = client.client.Do(r)
+	response, err = cl.client.Do(r)
 
 	return
 }
 
-func (client *HTTP2Client) Get(path string, headers http.Header) (b []byte, err error) {
+func (cl *HTTP2Client) Get(path string, headers http.Header) (b []byte, err error) {
 	var response *http.Response
-	if response, err = client.request("GET", path, nil, headers); err != nil {
+	if response, err = cl.request("GET", path, nil, headers); err != nil {
 		return
 	}
 	defer response.Body.Close()
@@ -129,7 +131,7 @@ func (client *HTTP2Client) Get(path string, headers http.Header) (b []byte, err 
 	return
 }
 
-func (client *HTTP2Client) Post(path string, body []byte, headers http.Header) (b []byte, err error) {
+func (cl *HTTP2Client) Post(path string, body []byte, headers http.Header) (b []byte, err error) {
 	var bodyReader io.Reader
 
 	if body != nil {
@@ -137,7 +139,7 @@ func (client *HTTP2Client) Post(path string, body []byte, headers http.Header) (
 	}
 
 	var response *http.Response
-	if response, err = client.request("POST", path, bodyReader, headers); err != nil {
+	if response, err = cl.request("POST", path, bodyReader, headers); err != nil {
 		return
 	}
 	defer response.Body.Close()

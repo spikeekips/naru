@@ -21,6 +21,8 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	jw := JSONWriter{w: w, status: 200}
+
 	payload := sebakresource.NewAccount(&ac.BlockAccount)
-	sebakhttputils.MustWriteJSON(w, 200, payload)
+	jw.Write(payload)
 }
