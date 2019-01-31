@@ -360,11 +360,11 @@ func (d *Digest) saveAccounts(st *storage.Storage, addresses ...string) error {
 	return nil
 }
 
-func (d *Digest) saveBlock(st *storage.Storage, block item.Block, txs []item.Transaction) error {
+func (d *Digest) saveBlock(st *storage.Storage, block item.Block, txs []item.TransactionMessage) error {
 	var addresses []string
-	for _, tx := range txs {
-		// TODO remove
-		log.Debug("> tx", "tx", tx)
+	for _, txm := range txs {
+		log.Debug("> tx", "tx", txm)
+		tx := item.NewTransaction(txm.Transaction, block, txm.Raw)
 		if err := tx.Save(st); err != nil {
 			return err
 		}
@@ -373,7 +373,6 @@ func (d *Digest) saveBlock(st *storage.Storage, block item.Block, txs []item.Tra
 		}
 	}
 
-	// TODO remove
 	log.Debug("> block", "block", block)
 	if err := block.Save(st); err != nil {
 		return err

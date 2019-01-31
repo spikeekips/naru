@@ -97,7 +97,7 @@ func GetBlocks(s *Storage, options sebakstorage.ListOptions) (func() (sebakblock
 	return iterFunc, cf
 }
 
-func GetTransactions(s *Storage, hashes ...string) (txs []item.Transaction, err error) {
+func GetTransactions(s *Storage, hashes ...string) (txs []item.TransactionMessage, err error) {
 	for _, hash := range hashes {
 		if len(hash) < 1 {
 			continue
@@ -114,7 +114,7 @@ func GetTransactions(s *Storage, hashes ...string) (txs []item.Transaction, err 
 			return
 		}
 
-		txs = append(txs, item.NewTransaction(tx, tp.Message))
+		txs = append(txs, item.NewTransactionMessage(tx, tp.Message))
 	}
 
 	return
