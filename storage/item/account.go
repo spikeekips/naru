@@ -16,10 +16,6 @@ func NewAccount(ac sebakblock.BlockAccount) Account {
 	return Account{BlockAccount: ac}
 }
 
-func (a Account) Key() string {
-	return fmt.Sprintf("%s%s", storage.AccountPrefix, a.Address)
-}
-
 func (a Account) Save(st *storage.Storage) error {
 	var f func(string, interface{}) error
 	if found, err := st.Has(GetAccountKey(a.Address)); err != nil {
@@ -34,4 +30,9 @@ func (a Account) Save(st *storage.Storage) error {
 
 func GetAccountKey(address string) string {
 	return fmt.Sprintf("%s%s", storage.AccountPrefix, address)
+}
+
+func GetAccount(st *storage.Storage, address string) (ac Account, err error) {
+	err = st.Get(GetAccountKey(address), &ac)
+	return
 }

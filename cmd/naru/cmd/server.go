@@ -2,15 +2,20 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"strings"
+	"net/url"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	cmdcommon "boscoin.io/sebak/cmd/sebak/common"
-	sebakcommon "boscoin.io/sebak/lib/common"
-	sebaknetwork "boscoin.io/sebak/lib/network"
 	sebaknode "boscoin.io/sebak/lib/node"
+	sebakrunner "boscoin.io/sebak/lib/node/runner"
+	sebakstorage "boscoin.io/sebak/lib/storage"
+
+	"github.com/spikeekips/naru/api/rest"
+	"github.com/spikeekips/naru/common"
+	"github.com/spikeekips/naru/digest"
+	"github.com/spikeekips/naru/storage"
 )
 
 var (
@@ -22,11 +27,16 @@ func init() {
 		Use:  "server",
 		Long: "naru server is the api gateway for SEBAK",
 		Run: func(c *cobra.Command, args []string) {
+			log.Info("start naru server")
+
 			parseBasicFlags(serverCmd)
+			parseStorageFlags(serverCmd)
 			parseSEBAKFlags(serverCmd)
 			parseBindFlags(serverCmd)
 
-			if err := run(); err != nil {
+			PrintParsedFlags(log, serverCmd, flagLogFormat != "json")
+
+			if err := runServer(); err != nil {
 				log.Error("exited with error", "error", err)
 			}
 		},
@@ -35,55 +45,23 @@ func init() {
 
 	setBasicFlags(serverCmd)
 	setSEBAKFlags(serverCmd)
-
-	serverCmd.Flags().StringVar(&flagBind, "bind", flagBind, "bind to listen on")
-	serverCmd.Flags().StringVar(&flagHTTPLog, "http-log", flagHTTPLog, "set log file for HTTP request")
-	serverCmd.Flags().StringVar(&flagTLSCertFile, "tls-cert", flagTLSCertFile, "tls certificate file")
-	serverCmd.Flags().StringVar(&flagTLSKeyFile, "tls-key", flagTLSKeyFile, "tls key file")
+	setBindFlags(serverCmd)
+	setStorageFlags(serverCmd)
 }
 
-func parseBindFlags(c *cobra.Command) {
-	// --bind
-	if p, err := sebakcommon.ParseEndpoint(flagBind); err != nil {
-		cmdcommon.PrintFlagsError(c, "--bind", err)
-	} else {
-		bindEndpoint = p
-	}
-
-	if strings.ToLower(bindEndpoint.Scheme) == "https" {
-		if _, err := os.Stat(flagTLSCertFile); os.IsNotExist(err) {
-			cmdcommon.PrintFlagsError(c, "--tls-cert", err)
-		}
-		if _, err := os.Stat(flagTLSKeyFile); os.IsNotExist(err) {
-			cmdcommon.PrintFlagsError(c, "--tls-key", err)
-		}
-	}
-}
-
-func run() error {
-	var nt sebaknetwork.Network
-	{
-		networkConfig, err := sebaknetwork.NewHTTP2NetworkConfigFromEndpoint("naru", bindEndpoint)
-		if err != nil {
-			log.Crit("failed to create network", "error", err)
-			return err
-		}
-
-		nt = sebaknetwork.NewHTTP2Network(networkConfig)
-	}
-
+func runServer() error {
+	var err error
 	var nodeInfo sebaknode.NodeInfo
-	{ // node info
-		var err error
-
-		client := nt.GetClient(sebakEndpoint)
-		if client == nil {
+	{ // get node info
+		client, err := common.NewHTTP2Client(time.Second*2, (*url.URL)(sebakEndpoint), false, nil)
+		if err != nil {
 			err = fmt.Errorf("failed to create network client for sebak")
 			log.Crit(err.Error(), "endpoint", sebakEndpoint)
 			return err
 		}
+
 		var b []byte
-		if b, err = client.GetNodeInfo(); err != nil {
+		if b, err = client.Get(sebakrunner.NodeInfoHandlerPattern, nil); err != nil {
 			log.Crit("failed to get node info", "endpoint", sebakEndpoint, "error", err)
 			return err
 		}
@@ -98,15 +76,41 @@ func run() error {
 			return err
 		}
 
-		fmt.Println(">>>>", nodeInfo)
+		log.Debug("sebak nodeinfo", "nodeinfo", nodeInfo)
 	}
 
-	{ // check jsonrpc
+	// run digest first
+	var nst *sebakstorage.LevelDBBackend
+	if nst, err = sebakstorage.NewStorage(storageConfig); err != nil {
+		cmdcommon.PrintFlagsError(digestCmd, "--storage", err)
 	}
 
-	// validates the existing data
+	st = storage.NewStorage(nst)
 
-	// bind network
+	runner := digest.NewInitializeDigestRunner(st, sst, sebakInfo)
+	if flagRemoteBlock > 0 {
+		runner.TestLastRemoteBlock = flagRemoteBlock
+	}
+	if err = runner.Run(); err != nil {
+		return err
+	}
+
+	watchRunner := digest.NewWatchDigestRunner(st, sst, sebakInfo, runner.StoredRemoteBlock().Height+1)
+	go func() {
+		if err := watchRunner.Run(false); err != nil {
+			log.Crit("failed watchRunner", "error", err)
+		}
+	}()
+
+	// start network layers
+	restHandler := rest.NewHandler(st, sst)
+	restServer := rest.NewServer(bindEndpoint)
+	restServer.AddHandler("/", restHandler.Index)
+	restServer.AddHandler("/api/v1/accounts/{id}", restHandler.GetAccount)
+
+	if err := restServer.Start(); err != nil {
+		log.Crit("failed to run restServer", "error", err)
+	}
 
 	return nil
 }

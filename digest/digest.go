@@ -18,28 +18,31 @@ import (
 var maxNumberOfWorkers int = 100
 
 type Digest struct {
-	st          *storage.Storage
-	sst         *sebak.Storage
-	blocksLimit uint64
-	start       uint64
-	end         uint64
-	initialize  bool
+	st            *storage.Storage
+	sst           *sebak.Storage
+	genesisSource string
+	blocksLimit   uint64
+	start         uint64
+	end           uint64
+	initialize    bool
 }
 
-func NewDigest(st *storage.Storage, sst *sebak.Storage, start, end uint64, initialize bool) *Digest {
+func NewDigest(st *storage.Storage, sst *sebak.Storage, genesisSource string, start, end uint64, initialize bool) *Digest {
 	return &Digest{
-		st:          st,
-		sst:         sst.New(),
-		start:       start,
-		end:         end,
-		blocksLimit: sebakrunner.MaxLimitListOptions,
-		initialize:  initialize,
+		st:            st,
+		sst:           sst.New(),
+		genesisSource: genesisSource,
+		start:         start,
+		end:           end,
+		blocksLimit:   sebakrunner.MaxLimitListOptions,
+		initialize:    initialize,
 	}
 }
 
 func (d *Digest) Open() error {
 	err := d.sst.Provider().Open()
 	if err == nil {
+		log.Debug("sebak storage opened")
 		return nil
 	}
 
@@ -53,6 +56,7 @@ func (d *Digest) Open() error {
 func (d *Digest) Close() error {
 	err := d.sst.Provider().Close()
 	if err == nil {
+		log.Debug("sebak storage closed")
 		return nil
 	}
 
@@ -81,7 +85,7 @@ func (d *Digest) Digest() error {
 		"started":            started,
 	})
 
-	log_.Info("start digest")
+	log_.Debug("start digest")
 
 	chanWorker := make(chan [2]uint64, 1000)
 	chanError := make(chan error, 1000)
@@ -91,6 +95,7 @@ func (d *Digest) Digest() error {
 	}
 
 	var countCursors int
+	var cursorSet [][2]uint64
 	var start uint64 = d.start
 	for {
 		if start >= d.end {
@@ -102,11 +107,18 @@ func (d *Digest) Digest() error {
 		}
 
 		log_.Debug("cursor", "start", start, "end", end)
-		chanWorker <- [2]uint64{start, end}
+		cursorSet = append(cursorSet, [2]uint64{start, end})
 		start += d.blocksLimit
 		countCursors += 1
 	}
-	close(chanWorker)
+
+	go func() {
+		for _, cursors := range cursorSet {
+			log_.Debug("cursors", "start", cursors[0], "end", cursors[1])
+			chanWorker <- cursors
+		}
+		close(chanWorker)
+	}()
 
 	var count int
 	var err error
@@ -139,7 +151,7 @@ end:
 	d.logInsertedData()
 
 	ended := time.Now()
-	log_.Info("digest done", "end", ended, "elapsed", ended.Sub(started))
+	log_.Debug("digest done", "end", ended, "elapsed", ended.Sub(started))
 
 	return nil
 }
@@ -318,6 +330,8 @@ func (d *Digest) saveAccounts(st *storage.Storage, addresses ...string) error {
 			if !hasNext {
 				break
 			}
+			// TODO remove
+			log.Debug("> account", "ac", ac)
 			if err := ac.Save(st); err != nil {
 				return err
 			}
@@ -326,9 +340,15 @@ func (d *Digest) saveAccounts(st *storage.Storage, addresses ...string) error {
 		}
 	} else {
 		for _, address := range addresses {
+			if address == d.genesisSource {
+				continue
+			}
+
 			if ac, err := sebak.GetAccount(d.sst, address); err != nil {
+				log.Error("failed to get account from sebak", "address", address)
 				return err
 			} else if err := ac.Save(st); err != nil {
+				log.Error("failed to save account from sebak", "address", address)
 				return err
 			}
 			count += 1
@@ -343,6 +363,8 @@ func (d *Digest) saveAccounts(st *storage.Storage, addresses ...string) error {
 func (d *Digest) saveBlock(st *storage.Storage, block item.Block, txs []item.Transaction) error {
 	var addresses []string
 	for _, tx := range txs {
+		// TODO remove
+		log.Debug("> tx", "tx", tx)
 		if err := tx.Save(st); err != nil {
 			return err
 		}
@@ -351,13 +373,15 @@ func (d *Digest) saveBlock(st *storage.Storage, block item.Block, txs []item.Tra
 		}
 	}
 
+	// TODO remove
+	log.Debug("> block", "block", block)
 	if err := block.Save(st); err != nil {
 		return err
 	}
 
 	if d.initialize {
 		if err := d.saveAccounts(st, addresses...); err != nil {
-			log.Debug("failed to save accounts", "block", block.Height, "error", err, "txs", txs)
+			log.Error("failed to save accounts", "block", block.Height, "error", err, "txs", txs)
 			return err
 		}
 	}

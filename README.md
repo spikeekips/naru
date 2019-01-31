@@ -1,3 +1,3 @@
 # NARU
 
-The api gateway for SEBAK.
+API server for SEBAK. NARU does nothing :)

@@ -6,20 +6,30 @@ import (
 
 	sebakblock "boscoin.io/sebak/lib/block"
 	sebakcommon "boscoin.io/sebak/lib/common"
+	sebakkeypair "boscoin.io/sebak/lib/common/keypair"
 	sebakerrors "boscoin.io/sebak/lib/errors"
+	sebaknode "boscoin.io/sebak/lib/node"
 
 	"github.com/spikeekips/naru/sebak"
 	"github.com/spikeekips/naru/storage"
 	"github.com/spikeekips/naru/storage/item"
 )
 
+var farBlockHeight uint64 = 1000
+
 type BaseDigestRunner struct {
 	sync.RWMutex
 	st                  *storage.Storage
 	sst                 *sebak.Storage
+	sebakInfo           sebaknode.NodeInfo
 	storedRemoteBlock   sebakblock.Block
 	lastLocalBlock      item.Block
 	TestLastRemoteBlock uint64
+}
+
+func (d *BaseDigestRunner) GenesisSource() string {
+	kp := sebakkeypair.Master(string(d.sebakInfo.Policy.NetworkID))
+	return kp.Address()
 }
 
 func (d *BaseDigestRunner) LastLocalBlock() item.Block {
@@ -55,11 +65,12 @@ type InitializeDigestRunner struct {
 	initialize bool
 }
 
-func NewInitializeDigestRunner(st *storage.Storage, sst *sebak.Storage) *InitializeDigestRunner {
+func NewInitializeDigestRunner(st *storage.Storage, sst *sebak.Storage, sebakInfo sebaknode.NodeInfo) *InitializeDigestRunner {
 	return &InitializeDigestRunner{
 		BaseDigestRunner: &BaseDigestRunner{
-			st:  st,
-			sst: sst,
+			st:        st,
+			sst:       sst,
+			sebakInfo: sebakInfo,
 		},
 	}
 }
@@ -68,7 +79,6 @@ func (d *InitializeDigestRunner) Run() (err error) {
 	log.Debug("start InitializeDigestRunner")
 
 	sst := d.sst.New()
-
 	if err = sst.Provider().Open(); err != nil {
 		if err != sebak.ProviderNotClosedError {
 			return
@@ -102,9 +112,14 @@ func (d *InitializeDigestRunner) Run() (err error) {
 		var block item.Block
 		block, err = item.GetLastBlock(d.st)
 		if err != nil {
-			return
+			if e, ok := err.(*sebakerrors.Error); ok {
+				if e.Code != sebakerrors.StorageRecordDoesNotExist.Code {
+					return
+				}
+			}
+		} else {
+			d.setLastLocalBlock(block)
 		}
-		d.setLastLocalBlock(block)
 	}
 
 	if d.LastLocalBlock().Height < 1 {
@@ -113,21 +128,21 @@ func (d *InitializeDigestRunner) Run() (err error) {
 
 	log.Debug(
 		"last blocks",
-		"local-block", d.LastLocalBlock().Height,
-		"remote-block", lastRemoteBlock.Height,
+		"local", d.LastLocalBlock().Height,
+		"remote", lastRemoteBlock.Height,
 		"initialize", d.initialize,
 	)
 
 	if d.LastLocalBlock().Height == lastRemoteBlock.Height {
 		log.Debug(
 			"local block reached to the remote block",
-			"local-block", d.LastLocalBlock().Height,
-			"remote-block", lastRemoteBlock.Height,
+			"local", d.LastLocalBlock().Height,
+			"remote", lastRemoteBlock.Height,
 		)
 		return nil
 	}
 
-	digest := NewDigest(d.st, d.sst, d.LastLocalBlock().Height, lastRemoteBlock.Height, d.initialize)
+	digest := NewDigest(d.st, d.sst, d.GenesisSource(), d.LastLocalBlock().Height, lastRemoteBlock.Height, d.initialize)
 	if err = digest.Open(); err != nil {
 		log.Error("failed to open digest", "error", err)
 		return
@@ -148,17 +163,21 @@ type WatchDigestRunner struct {
 	start uint64
 }
 
-func NewWatchDigestRunner(st *storage.Storage, sst *sebak.Storage, start uint64) *WatchDigestRunner {
+func NewWatchDigestRunner(st *storage.Storage, sst *sebak.Storage, sebakInfo sebaknode.NodeInfo, start uint64) *WatchDigestRunner {
 	return &WatchDigestRunner{
 		BaseDigestRunner: &BaseDigestRunner{
-			st:  st,
-			sst: sst,
+			st:        st,
+			sst:       sst,
+			sebakInfo: sebakInfo,
 		},
 		start: start,
 	}
 }
 
-func (w *WatchDigestRunner) Run() error {
+// Run runs to watch and follow up the last remote block from sebak. By default,
+// Run does not run if the local block is far behind from the remote
+// block(`farBlockHeight`).
+func (w *WatchDigestRunner) Run(force bool) error {
 	sst := w.sst.New()
 	if err := sst.Provider().Open(); err != nil {
 		if err != sebak.ProviderNotClosedError {
@@ -204,14 +223,23 @@ func (w *WatchDigestRunner) Run() error {
 	log.Debug(
 		"start WatchDigestRunner",
 		"start", startRemoteBlock.Height,
-		"last-remote-block", lastRemoteBlock.Height,
+		"remote", lastRemoteBlock.Height,
 	)
 
 	if startRemoteBlock.Height < lastRemoteBlock.Height { // follow up
+		if !force && lastRemoteBlock.Height-startRemoteBlock.Height >= farBlockHeight {
+			log.Error(
+				"local block is too far from the remote block",
+				"local", startRemoteBlock,
+				"remote", lastRemoteBlock.Height,
+			)
+		}
+
 		go w.followup(startRemoteBlock.Height, lastRemoteBlock.Height-1)
 	}
 
 	w.watchLatestBlocks()
+
 	return nil
 }
 
@@ -220,6 +248,7 @@ func (w *WatchDigestRunner) watchLatestBlocks() {
 
 	for {
 		if err := w.watchLatestBlock(); err != nil {
+			log.Error("something wrong watchLatestBlock", "error", err)
 			time.Sleep(time.Second * 2)
 			continue
 		}
@@ -231,7 +260,7 @@ func (w *WatchDigestRunner) watchLatestBlocks() {
 func (w *WatchDigestRunner) followup(start, end uint64) error {
 	log.Debug("start to follow up", "start", start, "end", end)
 
-	digest := NewDigest(w.st, w.sst, start, end, false)
+	digest := NewDigest(w.st, w.sst, w.GenesisSource(), start, end, false)
 	if err := digest.Open(); err != nil {
 		log.Error("failed to open digest", "error", err)
 		return err
@@ -267,7 +296,7 @@ func (w *WatchDigestRunner) watchLatestBlock() error {
 		return nil
 	}
 
-	digest := NewDigest(w.st, w.sst, w.LastLocalBlock().Height, block.Height, false)
+	digest := NewDigest(w.st, w.sst, w.GenesisSource(), w.LastLocalBlock().Height, block.Height, false)
 	if err := digest.Open(); err != nil {
 		log.Error("failed to open digest", "error", err)
 		return err

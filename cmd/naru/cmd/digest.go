@@ -22,26 +22,13 @@ func init() {
 		Use:  "digest",
 		Long: "digest blocks from SEBAK",
 		Run: func(c *cobra.Command, args []string) {
+			log.Info("start naru digest")
+
 			parseBasicFlags(digestCmd)
-
-			log.Info("start naru")
-
 			parseSEBAKFlags(digestCmd)
 			parseStorageFlags(digestCmd)
 
-			// print flags
-			parsedFlags := []interface{}{}
-			parsedFlags = append(parsedFlags, "\n\t log-level", flagLogLevel)
-			parsedFlags = append(parsedFlags, "\n\t log-format", flagLogFormat)
-			parsedFlags = append(parsedFlags, "\n\t log", flagLog)
-			parsedFlags = append(parsedFlags, "\n\t sebak", flagSebak)
-			parsedFlags = append(parsedFlags, "\n\t jsonrpc", flagJSONRPC)
-			parsedFlags = append(parsedFlags, "\n\t storage", flagStorage)
-			parsedFlags = append(parsedFlags, "\n\t sebak-info", sebakInfo)
-			parsedFlags = append(parsedFlags, "\n\t init", flagInit)
-			parsedFlags = append(parsedFlags, "\n", "")
-
-			log.Debug("parsed flags:", parsedFlags...)
+			PrintParsedFlags(log, digestCmd, flagLogFormat != "json")
 
 			if err := runDigest(); err != nil {
 				log.Error("exited with error", "error", err)
@@ -53,9 +40,11 @@ func init() {
 	rootCmd.AddCommand(digestCmd)
 
 	setBasicFlags(digestCmd)
-	digestCmd.Flags().StringVar(&flagStorage, "storage", flagStorage, "storage uri")
+	setStorageFlags(digestCmd)
 	setSEBAKFlags(digestCmd)
+
 	digestCmd.Flags().BoolVar(&flagInit, "init", flagInit, "initialize")
+	digestCmd.Flags().BoolVar(&flagWatch, "watch", flagWatch, "watch new block from sebak")
 	digestCmd.Flags().Uint64Var(&flagRemoteBlock, "test-remote-block", flagRemoteBlock, "set last remote block for test")
 }
 
@@ -74,7 +63,7 @@ func runDigest() error {
 
 	st = storage.NewStorage(nst)
 
-	runner := digest.NewInitializeDigestRunner(st, sst)
+	runner := digest.NewInitializeDigestRunner(st, sst, sebakInfo)
 	if flagRemoteBlock > 0 {
 		runner.TestLastRemoteBlock = flagRemoteBlock
 	}
@@ -82,9 +71,11 @@ func runDigest() error {
 		return err
 	}
 
-	watchRunner := digest.NewWatchDigestRunner(st, sst, runner.StoredRemoteBlock().Height+1)
-	if err = watchRunner.Run(); err != nil {
-		return err
+	if flagWatch {
+		watchRunner := digest.NewWatchDigestRunner(st, sst, sebakInfo, runner.StoredRemoteBlock().Height+1)
+		if err = watchRunner.Run(true); err != nil {
+			return err
+		}
 	}
 
 	return nil

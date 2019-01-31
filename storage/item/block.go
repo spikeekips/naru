@@ -72,3 +72,34 @@ func GetLastBlock(st *storage.Storage) (Block, error) {
 
 	return GetBlock(st, hash)
 }
+
+func BlocksIterator(
+	st *storage.Storage,
+	iterFunc func() (sebakstorage.IterItem, bool),
+	closeFunc func(),
+) (
+	func() (Block, bool, []byte),
+	func(),
+) {
+
+	return (func() (Block, bool, []byte) {
+			item, hasNext := iterFunc()
+			if !hasNext {
+				return Block{}, false, []byte{}
+			}
+
+			var hash string
+			if err := storage.Deserialize(item.Value, &hash); err != nil {
+				return Block{}, false, []byte{}
+			}
+
+			b, err := GetBlock(st, hash)
+			if err != nil {
+				return Block{}, false, []byte{}
+			}
+
+			return b, hasNext, item.Key
+		}), (func() {
+			closeFunc()
+		})
+}
