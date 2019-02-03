@@ -6,6 +6,8 @@ require (
 	github.com/gorilla/rpc v1.1.0
 	github.com/inconshreveable/log15 v0.0.0-20180818164646-67afb5ed74ec
 	github.com/mattn/go-isatty v0.0.4
+	github.com/nvellon/hal v0.3.0
+	github.com/prometheus/client_golang v0.9.2
 	github.com/prometheus/common v0.0.0-20190107103113-2998b132700a
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.3

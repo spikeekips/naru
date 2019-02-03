@@ -1,0 +1,68 @@
+package rest
+
+import (
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/gorilla/mux"
+	"github.com/nvellon/hal"
+
+	sebakcommon "boscoin.io/sebak/lib/common"
+	sebakerrors "boscoin.io/sebak/lib/errors"
+	sebakresource "boscoin.io/sebak/lib/node/runner/api/resource"
+
+	"github.com/spikeekips/naru/storage/item"
+)
+
+func (h *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
+	jw := JSONWriter{w: w}
+
+	vars := mux.Vars(r)
+	hash := vars["hashOrHeight"]
+	if hash == "" {
+		jw.Write(sebakerrors.BadRequestParameter)
+		return
+	}
+
+	var block item.Block
+	var err error
+	var height uint64
+	height, err = strconv.ParseUint(hash, 10, 64)
+	switch {
+	case err == nil:
+		block, err = item.GetBlockByHeight(h.st, height)
+	case err != nil:
+		block, err = item.GetBlock(h.st, hash)
+	}
+	if err != nil {
+		jw.Write(err)
+		return
+	}
+
+	rs := sebakresource.NewBlock(&block.Block).Resource()
+
+	rs.Links["self"] = hal.NewLink(strings.Replace(
+		sebakresource.URLBlocks,
+		"{id}",
+		strconv.FormatUint(block.Height, 10),
+		-1,
+	))
+
+	if block.Height != sebakcommon.GenesisBlockHeight {
+		rs.AddLink("prev", hal.NewLink(strings.Replace(
+			sebakresource.URLBlocks,
+			"{id}",
+			strconv.FormatUint(block.Height-1, 10),
+			-1,
+		)))
+	}
+	rs.AddLink("next", hal.NewLink(strings.Replace(
+		sebakresource.URLBlocks,
+		"{id}",
+		strconv.FormatUint(block.Height+1, 10),
+		-1,
+	)))
+
+	jw.Write(rs)
+}

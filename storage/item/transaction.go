@@ -1,6 +1,7 @@
 package item
 
 import (
+	"encoding/json"
 	"fmt"
 
 	sebakblock "boscoin.io/sebak/lib/block"
@@ -87,6 +88,11 @@ func (t Transaction) Save(st *storage.Storage) error {
 	return nil
 }
 
+func (t Transaction) Transaction() (tx sebaktransaction.Transaction, err error) {
+	err = json.Unmarshal(t.Raw, &tx)
+	return
+}
+
 func (t Transaction) AllAccounts() []string {
 	if t.accounts != nil {
 		return t.accounts
@@ -148,4 +154,15 @@ func GetTransactionAccountsKey(address string, block uint64) string {
 		block,
 		sebakcommon.GetUniqueIDFromUUID(),
 	)
+}
+
+func ExistsTransaction(st *storage.Storage, hash string) (bool, error) {
+	return st.Has(GetTransactionKey(hash))
+}
+
+func GetTransaction(st *storage.Storage, hash string) (tx Transaction, err error) {
+	if err = st.Get(GetTransactionKey(hash), &tx); err != nil {
+		return
+	}
+	return
 }

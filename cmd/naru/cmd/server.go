@@ -103,10 +103,23 @@ func runServer() error {
 	}()
 
 	// start network layers
-	restHandler := rest.NewHandler(st, sst)
+	restHandler := rest.NewHandler(st, sst, sebakInfo)
 	restServer := rest.NewServer(bindEndpoint)
 	restServer.AddHandler("/", restHandler.Index)
-	restServer.AddHandler("/api/v1/accounts/{id}", restHandler.GetAccount)
+	restServer.AddHandler("/api/v1/accounts", restHandler.GetAccounts).
+		Methods("POST").
+		Headers("Content-Type", "application/json")
+	restServer.AddHandler("/api/v1/accounts/{id}", restHandler.GetAccount).
+		Methods("GET")
+	restServer.AddHandler("/api/v1/blocks/{hashOrHeight}", restHandler.GetBlock).
+		Methods("GET")
+	restServer.AddHandler("/api/v1/transactions", restHandler.PostTransaction).
+		Methods("POST").
+		Headers("Content-Type", "application/json")
+	restServer.AddHandler("/api/v1/transactions/{id}/status", restHandler.GetTransactionStatus).
+		Methods("Get")
+	restServer.AddHandler("/api/v1/transactions/{id}", restHandler.GetTransactionByHash).
+		Methods("Get")
 
 	if err := restServer.Start(); err != nil {
 		log.Crit("failed to run restServer", "error", err)

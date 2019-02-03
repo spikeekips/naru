@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"boscoin.io/sebak/lib/errors"
 	sebakhttputils "boscoin.io/sebak/lib/network/httputils"
 )
 
@@ -45,6 +46,7 @@ type JSONWriter struct {
 	status     int
 	w          http.ResponseWriter
 	sentHeader bool
+	setStatus  bool
 }
 
 func (j *JSONWriter) setHeader(name, value string) {
@@ -54,22 +56,51 @@ func (j *JSONWriter) setHeader(name, value string) {
 	j.w.Header().Set(name, value)
 }
 
-func (j *JSONWriter) Write(v interface{}) error {
+func (j *JSONWriter) SetStatus(status int) {
+	j.status = status
+	j.setStatus = true
+}
+
+func (j *JSONWriter) writeHeader(v interface{}) interface{} {
 	if h, ok := v.(sebakhttputils.HALResource); ok {
 		j.setHeader("Content-Type", "application/hal+json")
 		v = h.Resource()
 	} else if e, ok := v.(error); ok {
 		j.setHeader("Content-Type", "application/problem+json")
-		v = sebakhttputils.NewErrorProblem(e, j.status)
+
+		status := j.status
+		if !j.setStatus {
+			status := sebakhttputils.StatusCode(e)
+			if sebakError, ok := e.(*errors.Error); ok {
+				if s := sebakError.GetData("status"); s != nil {
+					status = s.(int)
+				}
+			}
+			j.status = status
+		}
+
+		v = sebakhttputils.NewErrorProblem(e, status)
 	} else {
 		j.setHeader("Content-Type", "application/json")
 	}
 
 	if !j.sentHeader {
-		j.w.WriteHeader(j.status)
+		status := j.status
+		if !j.setStatus {
+			if status < 1 {
+				status = 200
+			}
+		}
+		j.w.WriteHeader(status)
 	}
 
 	j.sentHeader = true
+
+	return v
+}
+
+func (j *JSONWriter) Write(v interface{}) error {
+	v = j.writeHeader(v)
 
 	bs, err := json.Marshal(v)
 	if err != nil {
@@ -77,6 +108,17 @@ func (j *JSONWriter) Write(v interface{}) error {
 	}
 
 	if _, err := j.w.Write(bs); err != nil {
+		return err
+	}
+	fmt.Fprintln(j.w)
+
+	return nil
+}
+
+func (j *JSONWriter) WriteByte(b []byte, status int) error {
+	j.w.WriteHeader(status)
+
+	if _, err := j.w.Write(b); err != nil {
 		return err
 	}
 	fmt.Fprintln(j.w)
