@@ -12,11 +12,12 @@ import (
 	sebakerrors "boscoin.io/sebak/lib/errors"
 	sebakresource "boscoin.io/sebak/lib/node/runner/api/resource"
 
+	"github.com/spikeekips/naru/api/rest"
 	"github.com/spikeekips/naru/storage/item"
 )
 
 func (h *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
-	jw := NewJSONWriter(w)
+	jw := rest.NewJSONWriter(w)
 
 	vars := mux.Vars(r)
 	hash := vars["hashOrHeight"]

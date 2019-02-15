@@ -15,6 +15,7 @@ import (
 	sebakcommon "boscoin.io/sebak/lib/common"
 	sebaknode "boscoin.io/sebak/lib/node"
 
+	"github.com/spikeekips/naru/api/rest"
 	cachebackend "github.com/spikeekips/naru/cache/backend"
 )
 
@@ -37,7 +38,7 @@ func NewServer(bind *sebakcommon.Endpoint, st *storage.Storage, sst *sebak.Stora
 		ReadHeaderTimeout: config.ReadHeaderTimeout,
 		WriteTimeout:      config.WriteTimeout,
 		*/
-		ErrorLog: goLog.New(HTTP2ErrorLog15Writer{httpLog}, "", 0),
+		ErrorLog: goLog.New(rest.HTTP2ErrorLog15Writer{L: httpLog}, "", 0),
 	}
 	core.SetKeepAlivesEnabled(true)
 
@@ -64,8 +65,8 @@ func NewServer(bind *sebakcommon.Endpoint, st *storage.Storage, sst *sebak.Stora
 	}
 
 	// TODO ratelimit
-	server.router.Use(FlushWriterMiddleware())
-	core.Handler = HTTP2Log15Handler{log: httpLog, handler: server.router}
+	server.router.Use(rest.FlushWriterMiddleware())
+	core.Handler = rest.HTTP2Log15Handler{Log: httpLog, Handler: server.router}
 
 	server.addDefaultHandlers()
 

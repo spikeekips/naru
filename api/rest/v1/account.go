@@ -10,6 +10,7 @@ import (
 	sebakerrors "boscoin.io/sebak/lib/errors"
 	sebakresource "boscoin.io/sebak/lib/node/runner/api/resource"
 
+	"github.com/spikeekips/naru/api/rest"
 	"github.com/spikeekips/naru/storage/item"
 )
 
@@ -21,7 +22,7 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	address := vars["id"]
 
-	jw := NewJSONWriter(w)
+	jw := rest.NewJSONWriter(w)
 
 	ac, err := item.GetAccount(h.st, address)
 	if err != nil {
@@ -35,7 +36,7 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetAccounts(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	jw := NewJSONWriter(w)
+	jw := rest.NewJSONWriter(w)
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/spikeekips/naru/api/rest"
 	"github.com/spikeekips/naru/cache"
 	cachebackend "github.com/spikeekips/naru/cache/backend"
 )
@@ -109,12 +110,12 @@ func (c *CacheHandler) Handler() func(http.ResponseWriter, *http.Request) {
 
 		if raw, err := c.cch.Get(cacheKey); err != nil {
 			if err != cachebackend.CacheItemNotFound {
-				jw := NewJSONWriter(w)
+				jw := rest.NewJSONWriter(w)
 				jw.WriteObject(err)
 				return
 			}
 		} else if item, ok := raw.(CacheItem); !ok {
-			jw := NewJSONWriter(w)
+			jw := rest.NewJSONWriter(w)
 			jw.WriteObject(fmt.Errorf("something wrong in cache"))
 			return
 		} else {

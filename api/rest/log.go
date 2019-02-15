@@ -1,4 +1,4 @@
-package restv1
+package rest
 
 import (
 	"net/http"
@@ -7,17 +7,18 @@ import (
 	"time"
 
 	logging "github.com/inconshreveable/log15"
+	"github.com/prometheus/common/log"
 
 	sebakcommon "boscoin.io/sebak/lib/common"
 	sebakmetrics "boscoin.io/sebak/lib/metrics"
 )
 
 type HTTP2ErrorLog15Writer struct {
-	l logging.Logger
+	L logging.Logger
 }
 
 func (w HTTP2ErrorLog15Writer) Write(b []byte) (int, error) {
-	w.l.Error("error", "error", string(b))
+	w.L.Error("error", "error", string(b))
 	return 0, nil
 }
 
@@ -81,8 +82,8 @@ func (l *HTTP2ResponseLog15Writer) CloseNotify() <-chan bool {
 }
 
 type HTTP2Log15Handler struct {
-	log     logging.Logger
-	handler http.Handler
+	Log     logging.Logger
+	Handler http.Handler
 }
 
 var HeaderKeyFiltered []string = []string{
@@ -115,7 +116,7 @@ func (l HTTP2Log15Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		header[key] = value
 	}
 
-	l.log.Debug(
+	l.Log.Debug(
 		"request",
 		"content-length", r.ContentLength,
 		"content-type", r.Header.Get("Content-Type"),
@@ -132,11 +133,11 @@ func (l HTTP2Log15Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	)
 
 	writer := NewHTTP2ResponseLog15Writer(w)
-	l.handler.ServeHTTP(writer, r)
+	l.Handler.ServeHTTP(writer, r)
 
 	elapsed := time.Since(begin)
 
-	l.log.Debug(
+	l.Log.Debug(
 		"response",
 		"id", uid,
 		"status", writer.Status(),

@@ -15,6 +15,7 @@ import (
 	sebakresource "boscoin.io/sebak/lib/node/runner/api/resource"
 	sebaktransaction "boscoin.io/sebak/lib/transaction"
 
+	"github.com/spikeekips/naru/api/rest"
 	resourcev1 "github.com/spikeekips/naru/api/rest/v1/resource"
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/storage/item"
@@ -23,7 +24,7 @@ import (
 func (h *Handler) PostTransaction(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	jw := NewJSONWriter(w)
+	jw := rest.NewJSONWriter(w)
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -80,7 +81,7 @@ func (h *Handler) GetTransactionByHash(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	hash := vars["id"]
 
-	jw := NewJSONWriter(w)
+	jw := rest.NewJSONWriter(w)
 
 	tx, err := item.GetTransaction(h.st, hash)
 	if err != nil {
@@ -95,7 +96,7 @@ func (h *Handler) GetTransactionStatus(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	hash := vars["id"]
 
-	jw := NewJSONWriter(w)
+	jw := rest.NewJSONWriter(w)
 
 	status := "notfound"
 	if found, err := item.ExistsTransaction(h.st, hash); err != nil {

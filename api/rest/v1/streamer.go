@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/spikeekips/naru/api/rest"
 )
 
 type StreamHandler interface {
@@ -45,7 +47,7 @@ func (s Streamer) Handler(w http.ResponseWriter, r *http.Request) {
 		connCloseNotify = cw.CloseNotify()
 	}
 
-	jw := NewJSONWriter(w)
+	jw := rest.NewJSONWriter(w)
 	jw.Header().Set("X-SEBAK-TIMEOUT", s.timeout.String())
 
 	streamer, err := s.newHandler.NewRequest(

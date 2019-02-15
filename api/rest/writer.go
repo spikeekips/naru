@@ -1,10 +1,11 @@
-package restv1
+package rest
 
 import (
 	"encoding/json"
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/prometheus/common/log"
 
 	sebakerrors "boscoin.io/sebak/lib/errors"
 	sebakhttputils "boscoin.io/sebak/lib/network/httputils"
