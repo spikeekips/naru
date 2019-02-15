@@ -1,39 +1,42 @@
-package rest
+package restv1
 
 import (
-	"net/http"
-
 	"github.com/gorilla/mux"
 
-	sebakstorage "boscoin.io/sebak/lib/storage"
+	sebakapi "boscoin.io/sebak/lib/node/runner/api"
 
 	"github.com/spikeekips/naru/storage"
 	"github.com/spikeekips/naru/storage/item"
 )
 
 type OperationsByAccountStreamHandler struct {
+	BaseStreamHandler
 	H       *Handler
-	w       http.ResponseWriter
-	r       *http.Request
 	address string
+	query   *sebakapi.PageQuery
 }
 
-func (g OperationsByAccountStreamHandler) NewRequest(w http.ResponseWriter, r *http.Request) (StreamHandler, error) {
-	vars := mux.Vars(r)
+func (g OperationsByAccountStreamHandler) NewRequest(base BaseStreamHandler) (StreamHandler, error) {
+	vars := mux.Vars(base.Request())
 	address := vars["id"]
 
 	if _, err := item.GetAccount(g.H.st, address); err != nil {
 		return nil, err
 	}
 
-	return &OperationsByAccountStreamHandler{H: g.H, w: w, r: r, address: address}, nil
+	query, err := sebakapi.NewPageQuery(base.Request())
+	if err != nil {
+		return nil, err
+	}
+
+	return &OperationsByAccountStreamHandler{BaseStreamHandler: base, H: g.H, address: address, query: query}, nil
 }
 
 func (g *OperationsByAccountStreamHandler) Init() <-chan interface{} {
 	iterFunc, closeFunc := item.GetOperationsByAccount(
 		g.H.st,
 		g.address,
-		sebakstorage.NewDefaultListOptions(true, nil, 2),
+		g.query.ListOptions(),
 	)
 
 	ch := make(chan interface{})

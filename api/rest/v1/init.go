@@ -1,4 +1,4 @@
-package rest
+package restv1
 
 import (
 	logging "github.com/inconshreveable/log15"

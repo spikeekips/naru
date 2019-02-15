@@ -18,7 +18,7 @@ import (
 	sebaknode "boscoin.io/sebak/lib/node"
 	sebakstorage "boscoin.io/sebak/lib/storage"
 
-	"github.com/spikeekips/naru/api/rest"
+	restv1 "github.com/spikeekips/naru/api/rest/v1"
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/digest"
 	"github.com/spikeekips/naru/sebak"
@@ -131,20 +131,20 @@ func parseBasicFlags(c *cobra.Command) {
 
 		common.SetLogging(logLevel, logHandler)
 		digest.SetLogging(logLevel, logHandler)
-		rest.SetLogging(logLevel, logHandler)
+		restv1.SetLogging(logLevel, logHandler)
 		sebak.SetLogging(logLevel, logHandler)
 		storage.SetLogging(logLevel, logHandler)
 
 		// --http-log
 		if len(flagHTTPLog) < 1 {
-			rest.SetHTTPLogging(logLevel, logHandler)
+			restv1.SetHTTPLogging(logLevel, logHandler)
 		} else {
 			// in `http-log`, http log will be json format
 			httpLogHandler, err := logging.FileHandler(flagHTTPLog, sebakcommon.JsonFormatEx(false, true))
 			if err != nil {
 				cmdcommon.PrintFlagsError(c, "--http-log", err)
 			}
-			rest.SetHTTPLogging(logging.LvlDebug, httpLogHandler) // httpLog only use `Debug`
+			restv1.SetHTTPLogging(logging.LvlDebug, httpLogHandler) // httpLog only use `Debug`
 		}
 	}
 }

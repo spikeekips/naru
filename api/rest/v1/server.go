@@ -1,4 +1,4 @@
-package rest
+package restv1
 
 import (
 	goLog "log"
@@ -63,6 +63,7 @@ func NewServer(bind *sebakcommon.Endpoint, st *storage.Storage, sst *sebak.Stora
 		router:    mux.NewRouter(),
 	}
 
+	// TODO ratelimit
 	server.router.Use(FlushWriterMiddleware())
 	core.Handler = HTTP2Log15Handler{log: httpLog, handler: server.router}
 

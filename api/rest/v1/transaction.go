@@ -1,4 +1,4 @@
-package rest
+package restv1
 
 import (
 	"encoding/json"
@@ -15,7 +15,7 @@ import (
 	sebakresource "boscoin.io/sebak/lib/node/runner/api/resource"
 	sebaktransaction "boscoin.io/sebak/lib/transaction"
 
-	"github.com/spikeekips/naru/api/rest/resource"
+	resourcev1 "github.com/spikeekips/naru/api/rest/v1/resource"
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/storage/item"
 )
@@ -88,7 +88,7 @@ func (h *Handler) GetTransactionByHash(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jw.WriteObject(resource.NewTransaction(tx))
+	jw.WriteObject(resourcev1.NewTransaction(tx))
 }
 
 func (h *Handler) GetTransactionStatus(w http.ResponseWriter, r *http.Request) {

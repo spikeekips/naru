@@ -14,7 +14,7 @@ import (
 	sebakrunner "boscoin.io/sebak/lib/node/runner"
 	sebakstorage "boscoin.io/sebak/lib/storage"
 
-	"github.com/spikeekips/naru/api/rest"
+	restv1 "github.com/spikeekips/naru/api/rest/v1"
 	cachebackend "github.com/spikeekips/naru/cache/backend"
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/digest"
@@ -100,27 +100,15 @@ func runServer() error {
 	st = storage.NewStorage(nst)
 
 	storage.Observer.On(storage.EventNewBlock, func(v ...interface{}) {
-		fmt.Println("BBBBBBBBBBBBBBB")
-		fmt.Println("BBBBBBBBBBBBBBB", v)
-		fmt.Println("BBBBBBBBBBBBBBB")
-		fmt.Println("BBBBBBBBBBBBBBB")
-		fmt.Println("BBBBBBBBBBBBBBB")
+		fmt.Println("> new block triggered", v)
 	})
 
 	storage.Observer.On(storage.EventNewAccount, func(v ...interface{}) {
-		fmt.Println("AAAAAAAAAAAAAAA")
-		fmt.Println("AAAAAAAAAAAAAAA", v)
-		fmt.Println("AAAAAAAAAAAAAAA")
-		fmt.Println("AAAAAAAAAAAAAAA")
-		fmt.Println("AAAAAAAAAAAAAAA")
+		fmt.Println("> new account triggered", v)
 	})
 
 	storage.Observer.On(storage.EventUpdateAccount, func(v ...interface{}) {
-		fmt.Println("UUUUUUUUUUUUUU")
-		fmt.Println("UUUUUUUUUUUUUU", v)
-		fmt.Println("UUUUUUUUUUUUUU")
-		fmt.Println("UUUUUUUUUUUUUU")
-		fmt.Println("UUUUUUUUUUUUUU")
+		fmt.Println("> account updated", v)
 	})
 
 	runner := digest.NewInitializeDigestRunner(st, sst, sebakInfo)
@@ -141,7 +129,7 @@ func runServer() error {
 	// start network layers
 	cb := cachebackend.NewGoCache()
 
-	restServer := rest.NewServer(bindEndpoint, st, sst, cb, sebakInfo)
+	restServer := restv1.NewServer(bindEndpoint, st, sst, cb, sebakInfo)
 	if flagProfile {
 		restServer.AddHandler("/debug/pprof/", pprof.Index)
 		restServer.AddHandler("/debug/pprof/cmdline", pprof.Cmdline)

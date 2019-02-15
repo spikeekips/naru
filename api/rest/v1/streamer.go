@@ -1,4 +1,4 @@
-package rest
+package restv1
 
 import (
 	"fmt"
@@ -6,13 +6,26 @@ import (
 	"time"
 )
 
-type NewStreamHandler interface {
-	NewRequest(http.ResponseWriter, *http.Request) (StreamHandler, error)
-}
-
 type StreamHandler interface {
 	Init() <-chan interface{}
 	Stream() (<-chan interface{}, func())
+}
+
+type BaseStreamHandler struct {
+	w http.ResponseWriter
+	r *http.Request
+}
+
+func (b BaseStreamHandler) Request() *http.Request {
+	return b.r
+}
+
+func (b BaseStreamHandler) ResponseWriter() http.ResponseWriter {
+	return b.w
+}
+
+type NewStreamHandler interface {
+	NewRequest(BaseStreamHandler) (StreamHandler, error)
 }
 
 type Streamer struct {
@@ -33,7 +46,11 @@ func (s Streamer) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jw := NewJSONWriter(w)
-	streamer, err := s.newHandler.NewRequest(jw, r)
+	jw.Header().Set("X-SEBAK-TIMEOUT", s.timeout.String())
+
+	streamer, err := s.newHandler.NewRequest(
+		BaseStreamHandler{w: jw, r: r},
+	)
 	if err != nil {
 		jw.WriteObject(err)
 		return
