@@ -85,6 +85,16 @@ func (t Transaction) Save(st *storage.Storage) error {
 		}
 	}
 
+	for opIndex, op := range t.tx.B.Operations {
+		o, err := NewOperation(op, t.tx, uint64(opIndex), t.block.Height)
+		if err != nil {
+			return err
+		}
+		if err := o.Save(st); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

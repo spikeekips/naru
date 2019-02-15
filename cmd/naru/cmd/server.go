@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"net/http/pprof"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -13,13 +15,15 @@ import (
 	sebakstorage "boscoin.io/sebak/lib/storage"
 
 	"github.com/spikeekips/naru/api/rest"
+	cachebackend "github.com/spikeekips/naru/cache/backend"
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/digest"
 	"github.com/spikeekips/naru/storage"
 )
 
 var (
-	serverCmd *cobra.Command
+	serverCmd   *cobra.Command
+	flagProfile bool
 )
 
 func init() {
@@ -47,6 +51,8 @@ func init() {
 	setSEBAKFlags(serverCmd)
 	setBindFlags(serverCmd)
 	setStorageFlags(serverCmd)
+	serverCmd.Flags().BoolVar(&flagInit, "init", flagInit, "initialize")
+	serverCmd.Flags().BoolVar(&flagProfile, "profile", flagProfile, "enable http profiling")
 }
 
 func runServer() error {
@@ -79,6 +85,12 @@ func runServer() error {
 		log.Debug("sebak nodeinfo", "nodeinfo", nodeInfo)
 	}
 
+	if flagInit {
+		if err = os.RemoveAll(storageConfig.Path); err != nil {
+			cmdcommon.PrintFlagsError(digestCmd, "--storage", err)
+		}
+	}
+
 	// run digest first
 	var nst *sebakstorage.LevelDBBackend
 	if nst, err = sebakstorage.NewStorage(storageConfig); err != nil {
@@ -86,6 +98,30 @@ func runServer() error {
 	}
 
 	st = storage.NewStorage(nst)
+
+	storage.Observer.On(storage.EventNewBlock, func(v ...interface{}) {
+		fmt.Println("BBBBBBBBBBBBBBB")
+		fmt.Println("BBBBBBBBBBBBBBB", v)
+		fmt.Println("BBBBBBBBBBBBBBB")
+		fmt.Println("BBBBBBBBBBBBBBB")
+		fmt.Println("BBBBBBBBBBBBBBB")
+	})
+
+	storage.Observer.On(storage.EventNewAccount, func(v ...interface{}) {
+		fmt.Println("AAAAAAAAAAAAAAA")
+		fmt.Println("AAAAAAAAAAAAAAA", v)
+		fmt.Println("AAAAAAAAAAAAAAA")
+		fmt.Println("AAAAAAAAAAAAAAA")
+		fmt.Println("AAAAAAAAAAAAAAA")
+	})
+
+	storage.Observer.On(storage.EventUpdateAccount, func(v ...interface{}) {
+		fmt.Println("UUUUUUUUUUUUUU")
+		fmt.Println("UUUUUUUUUUUUUU", v)
+		fmt.Println("UUUUUUUUUUUUUU")
+		fmt.Println("UUUUUUUUUUUUUU")
+		fmt.Println("UUUUUUUUUUUUUU")
+	})
 
 	runner := digest.NewInitializeDigestRunner(st, sst, sebakInfo)
 	if flagRemoteBlock > 0 {
@@ -103,23 +139,16 @@ func runServer() error {
 	}()
 
 	// start network layers
-	restHandler := rest.NewHandler(st, sst, sebakInfo)
-	restServer := rest.NewServer(bindEndpoint)
-	restServer.AddHandler("/", restHandler.Index)
-	restServer.AddHandler("/api/v1/accounts", restHandler.GetAccounts).
-		Methods("POST").
-		Headers("Content-Type", "application/json")
-	restServer.AddHandler("/api/v1/accounts/{id}", restHandler.GetAccount).
-		Methods("GET")
-	restServer.AddHandler("/api/v1/blocks/{hashOrHeight}", restHandler.GetBlock).
-		Methods("GET")
-	restServer.AddHandler("/api/v1/transactions", restHandler.PostTransaction).
-		Methods("POST").
-		Headers("Content-Type", "application/json")
-	restServer.AddHandler("/api/v1/transactions/{id}/status", restHandler.GetTransactionStatus).
-		Methods("Get")
-	restServer.AddHandler("/api/v1/transactions/{id}", restHandler.GetTransactionByHash).
-		Methods("Get")
+	cb := cachebackend.NewGoCache()
+
+	restServer := rest.NewServer(bindEndpoint, st, sst, cb, sebakInfo)
+	if flagProfile {
+		restServer.AddHandler("/debug/pprof/", pprof.Index)
+		restServer.AddHandler("/debug/pprof/cmdline", pprof.Cmdline)
+		restServer.AddHandler("/debug/pprof/profile", pprof.Profile)
+		restServer.AddHandler("/debug/pprof/symbol", pprof.Symbol)
+		restServer.AddHandler("/debug/pprof/trace", pprof.Trace)
+	}
 
 	if err := restServer.Start(); err != nil {
 		log.Crit("failed to run restServer", "error", err)

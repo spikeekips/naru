@@ -142,14 +142,20 @@ func (d *InitializeDigestRunner) Run() (err error) {
 		return nil
 	}
 
-	digest := NewDigest(d.st, d.sst, d.GenesisSource(), d.LastLocalBlock().Height, lastRemoteBlock.Height, d.initialize)
-	if err = digest.Open(); err != nil {
+	var dg *Digest
+	dg, err = NewDigest(d.st, d.sst, d.GenesisSource(), d.LastLocalBlock().Height, lastRemoteBlock.Height, d.initialize)
+	if err != nil {
 		log.Error("failed to open digest", "error", err)
 		return
 	}
-	defer digest.Close()
 
-	if err = digest.Digest(); err != nil {
+	if err = dg.Open(); err != nil {
+		log.Error("failed to open digest", "error", err)
+		return
+	}
+	defer dg.Close()
+
+	if err = dg.Digest(); err != nil {
 		return
 	}
 
@@ -238,16 +244,38 @@ func (w *WatchDigestRunner) Run(force bool) error {
 		go w.followup(startRemoteBlock.Height, lastRemoteBlock.Height-1)
 	}
 
-	w.watchLatestBlocks()
+	w.watchLatestBlocks(lastRemoteBlock.Height)
 
 	return nil
 }
 
-func (w *WatchDigestRunner) watchLatestBlocks() {
-	log.Debug("start watchLatestBlocks")
+func (w *WatchDigestRunner) followup(start, end uint64) error {
+	log.Debug("start to follow up", "start", start, "end", end)
+
+	dg, err := NewDigest(w.st, w.sst, w.GenesisSource(), start, end, false)
+	if err != nil {
+		log.Error("failed to open digest", "error", err)
+		return err
+	}
+
+	if err := dg.Open(); err != nil {
+		log.Error("failed to open digest", "error", err)
+		return err
+	}
+	defer dg.Close()
+
+	if err := dg.Digest(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (w *WatchDigestRunner) watchLatestBlocks(lastBlock uint64) {
+	log.Debug("start watchLatestBlocks", "last-block", lastBlock)
 
 	for {
-		if err := w.watchLatestBlock(); err != nil {
+		if err := w.watchLatestBlock(lastBlock); err != nil {
 			log.Error("something wrong watchLatestBlock", "error", err)
 			time.Sleep(time.Second * 2)
 			continue
@@ -257,24 +285,7 @@ func (w *WatchDigestRunner) watchLatestBlocks() {
 	}
 }
 
-func (w *WatchDigestRunner) followup(start, end uint64) error {
-	log.Debug("start to follow up", "start", start, "end", end)
-
-	digest := NewDigest(w.st, w.sst, w.GenesisSource(), start, end, false)
-	if err := digest.Open(); err != nil {
-		log.Error("failed to open digest", "error", err)
-		return err
-	}
-	err := digest.Digest()
-	digest.Close()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (w *WatchDigestRunner) watchLatestBlock() error {
+func (w *WatchDigestRunner) watchLatestBlock(lastBlock uint64) error {
 	sst := w.sst.New()
 	if err := sst.Provider().Open(); err != nil {
 		if err != sebak.ProviderNotClosedError {
@@ -291,19 +302,32 @@ func (w *WatchDigestRunner) watchLatestBlock() error {
 		log.Error("failed to get last remote block", "error", err)
 		return err
 	}
+	if block.Height < lastBlock {
+		return nil
+	}
 
 	if block.Height == w.LastLocalBlock().Height {
 		return nil
 	}
 
-	digest := NewDigest(w.st, w.sst, w.GenesisSource(), w.LastLocalBlock().Height, block.Height, false)
-	if err := digest.Open(); err != nil {
+	start := w.LastLocalBlock().Height
+	if start < lastBlock {
+		start = lastBlock
+	}
+
+	db, err := NewDigest(w.st, w.sst, w.GenesisSource(), start, block.Height, false)
+	if err != nil {
 		log.Error("failed to open digest", "error", err)
 		return err
 	}
-	defer digest.Close()
 
-	if err := digest.Digest(); err != nil {
+	if err := db.Open(); err != nil {
+		log.Error("failed to open digest", "error", err)
+		return err
+	}
+	defer db.Close()
+
+	if err := db.Digest(); err != nil {
 		log.Error("failed to digest", "error", err)
 		return err
 	}

@@ -27,6 +27,8 @@ func (b Block) Save(st *storage.Storage) error {
 		return err
 	}
 
+	st.AddEvent(storage.EventNewBlock, b)
+
 	return nil
 }
 

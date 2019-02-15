@@ -16,12 +16,12 @@ import (
 )
 
 func (h *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
-	jw := JSONWriter{w: w}
+	jw := NewJSONWriter(w)
 
 	vars := mux.Vars(r)
 	hash := vars["hashOrHeight"]
 	if hash == "" {
-		jw.Write(sebakerrors.BadRequestParameter)
+		jw.WriteObject(sebakerrors.BadRequestParameter)
 		return
 	}
 
@@ -36,7 +36,7 @@ func (h *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
 		block, err = item.GetBlock(h.st, hash)
 	}
 	if err != nil {
-		jw.Write(err)
+		jw.WriteObject(err)
 		return
 	}
 
@@ -64,5 +64,5 @@ func (h *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
 		-1,
 	)))
 
-	jw.Write(rs)
+	jw.WriteObject(rs)
 }

@@ -1,6 +1,7 @@
 package digest
 
 import (
+	"fmt"
 	"time"
 
 	logging "github.com/inconshreveable/log15"
@@ -27,7 +28,11 @@ type Digest struct {
 	initialize    bool
 }
 
-func NewDigest(st *storage.Storage, sst *sebak.Storage, genesisSource string, start, end uint64, initialize bool) *Digest {
+func NewDigest(st *storage.Storage, sst *sebak.Storage, genesisSource string, start, end uint64, initialize bool) (*Digest, error) {
+	if start > end {
+		return nil, fmt.Errorf("invalid start and end range: %d - %d", start, end)
+	}
+
 	return &Digest{
 		st:            st,
 		sst:           sst.New(),
@@ -36,7 +41,7 @@ func NewDigest(st *storage.Storage, sst *sebak.Storage, genesisSource string, st
 		end:           end,
 		blocksLimit:   sebakrunner.MaxLimitListOptions,
 		initialize:    initialize,
-	}
+	}, nil
 }
 
 func (d *Digest) Open() error {
@@ -68,6 +73,10 @@ func (d *Digest) Close() error {
 }
 
 func (d *Digest) Digest() error {
+	if d.end == d.start {
+		return nil
+	}
+
 	numberOfWorkers := int((d.end - d.start) / d.blocksLimit)
 	if numberOfWorkers < 1 {
 		numberOfWorkers = 1
@@ -82,7 +91,6 @@ func (d *Digest) Digest() error {
 		"blocksLimit":        d.blocksLimit,
 		"numberOfWorkers":    numberOfWorkers,
 		"maxNumberOfWorkers": maxNumberOfWorkers,
-		"started":            started,
 	})
 
 	log_.Debug("start digest")
@@ -148,7 +156,8 @@ end:
 		}
 	}
 
-	d.logInsertedData()
+	// TODO remove
+	//d.logInsertedData()
 
 	ended := time.Now()
 	log_.Debug("digest done", "end", ended, "elapsed", ended.Sub(started))
@@ -202,7 +211,7 @@ func (d *Digest) digestBlocksByHeight(start, end uint64) error {
 		}
 
 		block = item.NewBlock(blk)
-		if err := d.storeBlock(block); err != nil {
+		if err := d.digestBlock(block); err != nil {
 			return err
 		}
 
@@ -213,7 +222,7 @@ func (d *Digest) digestBlocksByHeight(start, end uint64) error {
 	return nil
 }
 
-func (d *Digest) storeBlock(block item.Block) (err error) {
+func (d *Digest) digestBlock(block item.Block) (err error) {
 	var txHashes []string
 	txHashes = append(txHashes, block.Transactions...)
 	txHashes = append(txHashes, block.ProposerTransaction)
@@ -239,8 +248,12 @@ func (d *Digest) storeBlock(block item.Block) (err error) {
 		}
 	}
 
-	log.Debug("block saved", "block", block.Height, "txs", len(txHashes))
-	return st.Commit()
+	if err = st.Commit(); err == nil {
+		log.Debug("block saved", "block", block.Height, "txs", len(txHashes))
+		st.TriggerEvents()
+	}
+
+	return err
 }
 
 func (d *Digest) logInsertedData() {
@@ -330,11 +343,10 @@ func (d *Digest) saveAccounts(st *storage.Storage, addresses ...string) error {
 			if !hasNext {
 				break
 			}
-			// TODO remove
-			log.Debug("> account", "ac", ac)
 			if err := ac.Save(st); err != nil {
 				return err
 			}
+			log.Debug("save account", "account", ac)
 
 			count += 1
 		}
@@ -363,22 +375,23 @@ func (d *Digest) saveAccounts(st *storage.Storage, addresses ...string) error {
 func (d *Digest) saveBlock(st *storage.Storage, block item.Block, txs []item.TransactionMessage) error {
 	var addresses []string
 	for _, txm := range txs {
-		log.Debug("> tx", "tx", txm)
 		tx := item.NewTransaction(txm.Transaction, block, txm.Raw)
 		if err := tx.Save(st); err != nil {
+			log.Error("failed to save transaction", "tx", tx.Hash)
 			return err
 		}
-		if d.initialize {
+		log.Debug("save transaction", "tx", txm)
+		if !d.initialize {
 			addresses = append(addresses, tx.AllAccounts()...)
 		}
 	}
 
-	log.Debug("> block", "block", block)
 	if err := block.Save(st); err != nil {
 		return err
 	}
 
-	if d.initialize {
+	log.Debug("save block", "block", block)
+	if !d.initialize {
 		if err := d.saveAccounts(st, addresses...); err != nil {
 			log.Error("failed to save accounts", "block", block.Height, "error", err, "txs", txs)
 			return err

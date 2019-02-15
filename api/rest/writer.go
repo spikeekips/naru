@@ -2,40 +2,68 @@ package rest
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
 
-	"boscoin.io/sebak/lib/errors"
+	sebakerrors "boscoin.io/sebak/lib/errors"
 	sebakhttputils "boscoin.io/sebak/lib/network/httputils"
 )
 
+type FakeCloseNotifier struct {
+}
+
+func (f FakeCloseNotifier) CloseNotify() <-chan bool {
+	return nil
+}
+
+type FakeFlusher struct {
+}
+
+func (f FakeFlusher) Flush() {
+}
+
 type FlushWriter struct {
-	w http.ResponseWriter
+	http.ResponseWriter
+	flusher http.Flusher
 }
 
-func (fw FlushWriter) Header() http.Header {
-	return fw.w.Header()
-}
+func NewFlushWriter(w http.ResponseWriter) FlushWriter {
+	var flusher http.Flusher = FakeFlusher{}
+	if f, ok := w.(http.Flusher); ok {
+		flusher = f
+	} else {
+		log.Warn("FakeFlusher used")
+	}
 
-func (fw FlushWriter) WriteHeader(status int) {
-	fw.w.WriteHeader(status)
+	return FlushWriter{ResponseWriter: w, flusher: flusher}
 }
 
 func (fw FlushWriter) Write(p []byte) (n int, err error) {
-	n, err = fw.w.Write(p)
-	if f, ok := fw.w.(http.Flusher); ok {
-		f.Flush()
-	}
+	n, err = fw.ResponseWriter.Write(p)
+	fw.flusher.Flush()
+
 	return
+}
+
+func (fw FlushWriter) Flush() {
+	fw.flusher.Flush()
+}
+
+func (fw FlushWriter) CloseNotify() <-chan bool {
+	f, ok := fw.ResponseWriter.(http.CloseNotifier)
+	if !ok {
+		return nil
+	}
+
+	return f.CloseNotify()
 }
 
 func FlushWriterMiddleware() mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if _, ok := w.(FlushWriter); !ok {
-				w = FlushWriter{w}
+				w = NewFlushWriter(w)
 			}
 			next.ServeHTTP(w, r)
 		})
@@ -43,85 +71,56 @@ func FlushWriterMiddleware() mux.MiddlewareFunc {
 }
 
 type JSONWriter struct {
-	status     int
-	w          http.ResponseWriter
-	sentHeader bool
-	setStatus  bool
+	http.ResponseWriter
 }
 
-func (j *JSONWriter) setHeader(name, value string) {
-	if j.sentHeader {
-		return
-	}
-	j.w.Header().Set(name, value)
+func NewJSONWriter(w http.ResponseWriter) *JSONWriter {
+	return &JSONWriter{ResponseWriter: w}
 }
 
-func (j *JSONWriter) SetStatus(status int) {
-	j.status = status
-	j.setStatus = true
-}
-
-func (j *JSONWriter) writeHeader(v interface{}) interface{} {
-	if h, ok := v.(sebakhttputils.HALResource); ok {
-		j.setHeader("Content-Type", "application/hal+json")
-		v = h.Resource()
-	} else if e, ok := v.(error); ok {
-		j.setHeader("Content-Type", "application/problem+json")
-
-		status := j.status
-		if !j.setStatus {
-			status := sebakhttputils.StatusCode(e)
-			if sebakError, ok := e.(*errors.Error); ok {
-				if s := sebakError.GetData("status"); s != nil {
-					status = s.(int)
-				}
-			}
-			j.status = status
-		}
-
-		v = sebakhttputils.NewErrorProblem(e, status)
-	} else {
-		j.setHeader("Content-Type", "application/json")
-	}
-
-	if !j.sentHeader {
-		status := j.status
-		if !j.setStatus {
-			if status < 1 {
-				status = 200
-			}
-		}
-		j.w.WriteHeader(status)
-	}
-
-	j.sentHeader = true
-
-	return v
-}
-
-func (j *JSONWriter) Write(v interface{}) error {
-	v = j.writeHeader(v)
-
+func (j *JSONWriter) writeObject(v interface{}) (int, error) {
 	bs, err := json.Marshal(v)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	if _, err := j.w.Write(bs); err != nil {
-		return err
-	}
-	fmt.Fprintln(j.w)
-
-	return nil
+	return j.Write(append(bs, []byte("\n")...))
 }
 
-func (j *JSONWriter) WriteByte(b []byte, status int) error {
-	j.w.WriteHeader(status)
+var ErrorsToStatus = map[uint]int{
+	sebakerrors.StorageRecordDoesNotExist.Code: http.StatusNotFound,
+	sebakerrors.TransactionNotFound.Code:       http.StatusNotFound,
+}
 
-	if _, err := j.w.Write(b); err != nil {
-		return err
+func (j *JSONWriter) statusByError(err error) int {
+	var se *sebakerrors.Error
+	var ok bool
+	if se, ok = err.(*sebakerrors.Error); ok {
+		if c, ok := ErrorsToStatus[se.Code]; ok {
+			return c
+		}
+
+		if c := se.GetData("status"); c != nil {
+			return c.(int)
+		}
 	}
-	fmt.Fprintln(j.w)
 
-	return nil
+	return sebakhttputils.StatusCode(err)
+}
+
+func (j *JSONWriter) WriteObject(v interface{}) (int, error) {
+	if h, ok := v.(sebakhttputils.HALResource); ok {
+		j.Header().Set("Content-Type", "application/hal+json")
+		v = h.Resource()
+	} else if e, ok := v.(error); ok {
+		j.Header().Set("Content-Type", "application/problem+json")
+
+		status := j.statusByError(e)
+		j.WriteHeader(status)
+		v = sebakhttputils.NewErrorProblem(e, status)
+	} else {
+		j.Header().Set("Content-Type", "application/json")
+	}
+
+	return j.writeObject(v)
 }

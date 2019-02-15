@@ -22,23 +22,41 @@ func (w HTTP2ErrorLog15Writer) Write(b []byte) (int, error) {
 }
 
 type HTTP2ResponseLog15Writer struct {
-	w      http.ResponseWriter
-	status int
-	size   int
+	http.ResponseWriter
+	status        int
+	size          int
+	closeNotifier http.CloseNotifier
+	flusher       http.Flusher
 }
 
-func (l *HTTP2ResponseLog15Writer) Header() http.Header {
-	return l.w.Header()
+func NewHTTP2ResponseLog15Writer(w http.ResponseWriter) *HTTP2ResponseLog15Writer {
+	closeNotifier, ok := w.(http.CloseNotifier)
+	if !ok {
+		closeNotifier = FakeCloseNotifier{}
+		log.Warn("FakeCloseNotifier used")
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		flusher = FakeFlusher{}
+		log.Warn("FakeFlusher used")
+	}
+
+	return &HTTP2ResponseLog15Writer{
+		ResponseWriter: w,
+		closeNotifier:  closeNotifier,
+		flusher:        flusher,
+	}
 }
 
 func (l *HTTP2ResponseLog15Writer) Write(b []byte) (int, error) {
-	size, err := l.w.Write(b)
+	size, err := l.ResponseWriter.Write(b)
 	l.size += size
 	return size, err
 }
 
 func (l *HTTP2ResponseLog15Writer) WriteHeader(s int) {
-	l.w.WriteHeader(s)
+	l.ResponseWriter.WriteHeader(s)
 	l.status = s
 }
 
@@ -55,10 +73,11 @@ func (l *HTTP2ResponseLog15Writer) Size() int {
 }
 
 func (l *HTTP2ResponseLog15Writer) Flush() {
-	f, ok := l.w.(http.Flusher)
-	if ok {
-		f.Flush()
-	}
+	l.flusher.Flush()
+}
+
+func (l *HTTP2ResponseLog15Writer) CloseNotify() <-chan bool {
+	return l.closeNotifier.CloseNotify()
 }
 
 type HTTP2Log15Handler struct {
@@ -112,7 +131,7 @@ func (l HTTP2Log15Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"x-forwarded-for", strings.Split(r.Header.Get("X-Forwarded-For"), ",")[0],
 	)
 
-	writer := &HTTP2ResponseLog15Writer{w: w}
+	writer := NewHTTP2ResponseLog15Writer(w)
 	l.handler.ServeHTTP(writer, r)
 
 	elapsed := time.Since(begin)

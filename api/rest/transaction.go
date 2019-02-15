@@ -23,11 +23,11 @@ import (
 func (h *Handler) PostTransaction(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	jw := JSONWriter{w: w}
+	jw := NewJSONWriter(w)
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		jw.Write(err)
+		jw.WriteObject(err)
 		return
 	}
 
@@ -36,7 +36,7 @@ func (h *Handler) PostTransaction(w http.ResponseWriter, r *http.Request) {
 		err = sebakerrors.InvalidMessage.Clone().SetData(
 			"status", http.StatusBadRequest,
 		)
-		jw.Write(err)
+		jw.WriteObject(err)
 		return
 	}
 
@@ -46,7 +46,7 @@ func (h *Handler) PostTransaction(w http.ResponseWriter, r *http.Request) {
 		OpsLimit:  h.sebakInfo.Policy.OperationsLimit,
 	}
 	if err := tx.IsWellFormed(conf); err != nil {
-		jw.Write(err)
+		jw.WriteObject(err)
 		return
 	}
 
@@ -57,46 +57,49 @@ func (h *Handler) PostTransaction(w http.ResponseWriter, r *http.Request) {
 		http.Header{"Content-Type": []string{"application/json"}},
 	)
 	if err != nil {
-		jw.Write(err)
+		jw.WriteObject(err)
 		return
 	}
 
 	var b []byte
 	if b, err = client.Post("/api/v1/transactions", body, nil); err != nil {
 		if se, ok := err.(*sebakerrors.Error); ok {
-			jw.WriteByte([]byte(se.GetData("body").(string)), se.GetData("status").(int))
+			w.WriteHeader(se.GetData("status").(int))
+			w.Write([]byte(se.GetData("body").(string)))
 			return
 		}
-		jw.Write(err)
+
+		jw.WriteObject(err)
 		return
 	}
-	jw.WriteByte(b, http.StatusOK)
+
+	w.Write(b)
 }
 
 func (h *Handler) GetTransactionByHash(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	hash := vars["id"]
 
-	jw := JSONWriter{w: w}
+	jw := NewJSONWriter(w)
 
 	tx, err := item.GetTransaction(h.st, hash)
 	if err != nil {
-		jw.Write(err)
+		jw.WriteObject(err)
 		return
 	}
 
-	jw.Write(resource.NewTransaction(tx))
+	jw.WriteObject(resource.NewTransaction(tx))
 }
 
 func (h *Handler) GetTransactionStatus(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	hash := vars["id"]
 
-	jw := JSONWriter{w: w}
+	jw := NewJSONWriter(w)
 
 	status := "notfound"
 	if found, err := item.ExistsTransaction(h.st, hash); err != nil {
-		jw.Write(err)
+		jw.WriteObject(err)
 		return
 	} else if found {
 		status = "confirmed"
@@ -107,11 +110,15 @@ func (h *Handler) GetTransactionStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if status == "notfound" {
-		jw.SetStatus(http.StatusNotFound)
-		jw.Write(sebakerrors.TransactionNotFound)
+		jw.WriteHeader(http.StatusNotFound)
+		jw.WriteObject(sebakerrors.TransactionNotFound)
 		return
 	}
 
+	if status == "submitted" {
+		jw.WriteHeader(http.StatusAccepted)
+	}
+
 	payload := sebakresource.NewTransactionStatus(hash, status)
-	jw.Write(payload)
+	jw.WriteObject(payload)
 }
