@@ -1,8 +1,6 @@
 package common
 
 import (
-	"os"
-
 	logging "github.com/inconshreveable/log15"
 
 	sebakcommon "boscoin.io/sebak/lib/common"
@@ -10,19 +8,16 @@ import (
 
 var (
 	log logging.Logger = logging.New("module", "common")
-
-	DefaultLogLevel   logging.Lvl     = logging.LvlInfo
-	DefaultLogHandler logging.Handler = logging.StreamHandler(os.Stdout, logging.JsonFormat())
 )
 
 func init() {
-	SetLogging(sebakcommon.DefaultLogLevel, sebakcommon.DefaultLogHandler, log)
+	log.SetHandler(logging.LvlFilterHandler(sebakcommon.DefaultLogLevel, sebakcommon.DefaultLogHandler))
 }
 
-func SetLogging(level logging.Lvl, handler logging.Handler, logger ...logging.Logger) {
-	if len(logger) < 1 {
-		logger = []logging.Logger{log}
-	}
+func SetLoggingWithLogger(level logging.Lvl, handler logging.Handler, logger logging.Logger) {
+	logger.SetHandler(logging.LvlFilterHandler(level, handler))
+}
 
-	logger[0].SetHandler(logging.LvlFilterHandler(level, handler))
+func SetLogging(level logging.Lvl, handler logging.Handler) {
+	log.SetHandler(logging.LvlFilterHandler(level, handler))
 }

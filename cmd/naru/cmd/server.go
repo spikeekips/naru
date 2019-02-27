@@ -3,101 +3,110 @@ package cmd
 import (
 	"fmt"
 	"net/http/pprof"
-	"net/url"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	cmdcommon "boscoin.io/sebak/cmd/sebak/common"
-	sebaknode "boscoin.io/sebak/lib/node"
-	sebakrunner "boscoin.io/sebak/lib/node/runner"
 	sebakstorage "boscoin.io/sebak/lib/storage"
+	"github.com/spikeekips/cvc"
 
 	restv1 "github.com/spikeekips/naru/api/rest/v1"
 	cachebackend "github.com/spikeekips/naru/cache/backend"
-	"github.com/spikeekips/naru/common"
+	"github.com/spikeekips/naru/config"
 	"github.com/spikeekips/naru/digest"
+	"github.com/spikeekips/naru/sebak"
 	"github.com/spikeekips/naru/storage"
 )
 
 var (
-	serverCmd   *cobra.Command
-	flagProfile bool
+	serverConfigManager *cvc.Manager
 )
 
+type ServerConfig struct {
+	cvc.BaseGroup
+	SEBAK   *config.SEBAK
+	Digest  *config.Digest
+	System  *config.System
+	Network *config.Network
+	Storage *config.Storage
+	Log     *config.Logs
+
+	Verbose bool `flag-help:"verbose"`
+}
+
 func init() {
-	serverCmd = &cobra.Command{
-		Use:  "server",
+	var sc *ServerConfig
+	serverCmd := &cobra.Command{
+		Use:  "server [<config file>]",
 		Long: "naru server is the api gateway for SEBAK",
 		Run: func(c *cobra.Command, args []string) {
+			if len(args) > 0 {
+				serverConfigManager.SetViperConfigFile(args...)
+			}
+
+			if _, err := serverConfigManager.Merge(); err != nil {
+				cmdcommon.PrintError(c, err)
+			}
+
+			if err := sc.Log.SetAllLogging(log); err != nil {
+				cmdcommon.PrintError(c, err)
+			}
+
 			log.Info("start naru server")
 
-			parseBasicFlags(serverCmd)
-			parseStorageFlags(serverCmd)
-			parseSEBAKFlags(serverCmd)
-			parseBindFlags(serverCmd)
+			if _, err := serverConfigManager.Merge(); err != nil {
+				log.Error("failed to load config", "error", err)
+				cmdcommon.PrintError(c, err)
+			}
 
-			PrintParsedFlags(log, serverCmd, flagLogFormat != "json")
+			log.Debug("config merged", serverConfigManager.ConfigPprint()...)
+			log.Info("config merged")
 
-			if err := runServer(); err != nil {
+			if err := runServer(sc); err != nil {
 				log.Error("exited with error", "error", err)
 			}
 		},
 	}
 	rootCmd.AddCommand(serverCmd)
 
-	setBasicFlags(serverCmd)
-	setSEBAKFlags(serverCmd)
-	setBindFlags(serverCmd)
-	setStorageFlags(serverCmd)
-	serverCmd.Flags().BoolVar(&flagInit, "init", flagInit, "initialize")
-	serverCmd.Flags().BoolVar(&flagProfile, "profile", flagProfile, "enable http profiling")
+	sc = &ServerConfig{
+		SEBAK:   config.NewSEBAK(),
+		Digest:  &config.Digest{},
+		System:  config.NewSystem(),
+		Network: config.NewNetwork(),
+		Storage: config.NewStorage(),
+		Log:     config.NewLogs(),
+	}
+	serverConfigManager = cvc.NewManager(sc, serverCmd, viper.New())
 }
 
-func runServer() error {
+func runServer(sc *ServerConfig) error {
 	var err error
-	var nodeInfo sebaknode.NodeInfo
-	{ // get node info
-		client, err := common.NewHTTP2Client(time.Second*2, (*url.URL)(sebakEndpoint), false, nil)
-		if err != nil {
-			err = fmt.Errorf("failed to create network client for sebak")
-			log.Crit(err.Error(), "endpoint", sebakEndpoint)
-			return err
-		}
 
-		var b []byte
-		if b, err = client.Get(sebakrunner.NodeInfoHandlerPattern, nil); err != nil {
-			log.Crit("failed to get node info", "endpoint", sebakEndpoint, "error", err)
-			return err
-		}
-
-		if nodeInfo, err = sebaknode.NewNodeInfoFromJSON(b); err != nil {
-			log.Crit(
-				"failed to parse node info",
-				"endpoint", sebakEndpoint,
-				"error", err,
-				"received", string(b),
-			)
-			return err
-		}
-
-		log.Debug("sebak nodeinfo", "nodeinfo", nodeInfo)
+	nodeInfo, err := getNodeInfo(sc.SEBAK.Endpoint)
+	if err != nil {
+		return err
 	}
 
-	if flagInit {
-		if err = os.RemoveAll(storageConfig.Path); err != nil {
-			cmdcommon.PrintFlagsError(digestCmd, "--storage", err)
+	log.Debug("sebak nodeinfo", "nodeinfo", nodeInfo)
+
+	if sc.Digest.Init {
+		if err = os.RemoveAll(sc.Storage.Path); err != nil {
+			log.Crit("failed to remove storage", "directory", sc.Storage.Path, "error", err)
+			return err
 		}
 	}
 
 	// run digest first
 	var nst *sebakstorage.LevelDBBackend
-	if nst, err = sebakstorage.NewStorage(storageConfig); err != nil {
-		cmdcommon.PrintFlagsError(digestCmd, "--storage", err)
+	if nst, err = sebakstorage.NewStorage(sc.Storage.StorageConfig()); err != nil {
+		log.Crit("failed to load leveldb storage", "directory", sc.Storage.Path, "error", err)
+		return err
 	}
 
-	st = storage.NewStorage(nst)
+	st := storage.NewStorage(nst)
 
 	storage.Observer.On(storage.EventNewBlock, func(v ...interface{}) {
 		fmt.Println("> new block triggered", v)
@@ -111,15 +120,18 @@ func runServer() error {
 		fmt.Println("> account updated", v)
 	})
 
-	runner := digest.NewInitializeDigestRunner(st, sst, sebakInfo)
-	if flagRemoteBlock > 0 {
-		runner.TestLastRemoteBlock = flagRemoteBlock
+	provider := sebak.NewJSONRPCStorageProvider(sc.SEBAK.JSONRpc)
+	sst := sebak.NewStorage(provider)
+
+	runner := digest.NewInitializeDigestRunner(st, sst, nodeInfo)
+	if sc.Digest.RemoteBlock > 0 {
+		runner.TestLastRemoteBlock = sc.Digest.RemoteBlock
 	}
 	if err = runner.Run(); err != nil {
 		return err
 	}
 
-	watchRunner := digest.NewWatchDigestRunner(st, sst, sebakInfo, runner.StoredRemoteBlock().Height+1)
+	watchRunner := digest.NewWatchDigestRunner(st, sst, nodeInfo, runner.StoredRemoteBlock().Height+1)
 	go func() {
 		if err := watchRunner.Run(false); err != nil {
 			log.Crit("failed watchRunner", "error", err)
@@ -129,8 +141,8 @@ func runServer() error {
 	// start network layers
 	cb := cachebackend.NewGoCache()
 
-	restServer := restv1.NewServer(bindEndpoint, st, sst, cb, sebakInfo)
-	if flagProfile {
+	restServer := restv1.NewServer(sc.Network.Bind, st, sst, cb, nodeInfo)
+	if sc.System.Profile {
 		restServer.AddHandler("/debug/pprof/", pprof.Index)
 		restServer.AddHandler("/debug/pprof/cmdline", pprof.Cmdline)
 		restServer.AddHandler("/debug/pprof/profile", pprof.Profile)

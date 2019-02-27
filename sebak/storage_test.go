@@ -9,6 +9,8 @@ import (
 	sebakcommon "boscoin.io/sebak/lib/common"
 	sebakerrors "boscoin.io/sebak/lib/errors"
 	sebakstorage "boscoin.io/sebak/lib/storage"
+
+	"github.com/spikeekips/naru/storage"
 )
 
 type FakeSEBAKStorageProvider struct {
@@ -54,7 +56,7 @@ func (f *FakeSEBAKStorageProvider) Close() error {
 	return f.CloseError
 }
 
-func (f *FakeSEBAKStorageProvider) New() error {
+func (f *FakeSEBAKStorageProvider) New() StorageProvider {
 	return newFakeSEBAKStorageProvider()
 }
 
@@ -130,7 +132,7 @@ type testSuiteSEBAKStorageProvider struct {
 
 func (t *testSuiteSEBAKStorageProvider) makeItems(n int) (items []sebakstorage.IterItem) {
 	for i := 0; i < n; i++ {
-		v, _ := Serialize(sebakcommon.GetUniqueIDFromUUID())
+		v, _ := storage.Serialize(sebakcommon.GetUniqueIDFromUUID())
 		items = append(
 			items,
 			sebakstorage.IterItem{
@@ -148,7 +150,7 @@ func (t *testSuiteSEBAKStorageProvider) TestHas() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
 
-	st := NewSEBAKStorage(p)
+	st := NewStorage(p)
 	for _, item := range p.Items() {
 		found, err := st.Has(string(item.Key))
 		t.NoError(err)
@@ -160,7 +162,7 @@ func (t *testSuiteSEBAKStorageProvider) TestHasUnknownKey() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
 
-	st := NewSEBAKStorage(p)
+	st := NewStorage(p)
 	found, err := st.Has(sebakcommon.GetUniqueIDFromUUID())
 	t.NoError(err)
 	t.False(found)
@@ -171,10 +173,10 @@ func (t *testSuiteSEBAKStorageProvider) TestHasError() {
 	p.SetItems(t.makeItems(2))
 	p.GetError = fmt.Errorf("something wrong")
 
-	st := NewSEBAKStorage(p)
+	st := NewStorage(p)
 
 	var returned string
-	err := st.Get(string(p.Items()[1].Key), &returned)
+	_, err := st.Get(string(p.Items()[1].Key), &returned)
 	t.Equal(p.GetError, err)
 }
 
@@ -182,13 +184,13 @@ func (t *testSuiteSEBAKStorageProvider) TestGet() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
 
-	st := NewSEBAKStorage(p)
+	st := NewStorage(p)
 	for _, item := range p.Items() {
 		var returned string
 		var expected string
-		Deserialize(item.Value, &expected)
+		storage.Deserialize(item.Value, &expected)
 
-		err := st.Get(string(item.Key), &returned)
+		_, err := st.Get(string(item.Key), &returned)
 		t.NoError(err)
 
 		t.Equal(expected, returned)
@@ -199,10 +201,10 @@ func (t *testSuiteSEBAKStorageProvider) TestGetUnknownKey() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
 
-	st := NewSEBAKStorage(p)
+	st := NewStorage(p)
 
 	var returned string
-	err := st.Get(sebakcommon.GetUniqueIDFromUUID(), &returned)
+	_, err := st.Get(sebakcommon.GetUniqueIDFromUUID(), &returned)
 	t.Equal(err, sebakerrors.StorageRecordDoesNotExist)
 }
 
@@ -211,10 +213,10 @@ func (t *testSuiteSEBAKStorageProvider) TestGetError() {
 	p.SetItems(t.makeItems(2))
 	p.GetError = fmt.Errorf("something wrong")
 
-	st := NewSEBAKStorage(p)
+	st := NewStorage(p)
 
 	var returned string
-	err := st.Get(string(p.Items()[1].Key), &returned)
+	_, err := st.Get(string(p.Items()[1].Key), &returned)
 	t.Equal(p.GetError, err)
 }
 
@@ -222,7 +224,7 @@ func (t *testSuiteSEBAKStorageProvider) TestGetIterator() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
 
-	st := NewSEBAKStorage(p)
+	st := NewStorage(p)
 
 	iterFunc, closeFunc := st.GetIterator("", sebakstorage.NewDefaultListOptions(false, nil, uint64(len(p.Items()))))
 	defer closeFunc()
@@ -250,7 +252,7 @@ func (t *testSuiteSEBAKStorageProvider) TestGetIteratorCloseFunc() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
 
-	st := NewSEBAKStorage(p)
+	st := NewStorage(p)
 
 	iterFunc, closeFunc := st.GetIterator("", sebakstorage.NewDefaultListOptions(false, nil, uint64(len(p.Items()))))
 
@@ -266,7 +268,7 @@ func (t *testSuiteSEBAKStorageProvider) TestGetIteratorReverse() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
 
-	st := NewSEBAKStorage(p)
+	st := NewStorage(p)
 
 	iterFunc, closeFunc := st.GetIterator("", sebakstorage.NewDefaultListOptions(true, nil, uint64(len(p.Items()))))
 	defer closeFunc()
@@ -295,7 +297,7 @@ func (t *testSuiteSEBAKStorageProvider) TestGetIteratorError() {
 	p.SetItems(t.makeItems(5))
 	p.GetIteratorError = fmt.Errorf("something wrong")
 
-	st := NewSEBAKStorage(p)
+	st := NewStorage(p)
 
 	iterFunc, closeFunc := st.GetIterator("", sebakstorage.NewDefaultListOptions(true, nil, uint64(len(p.Items()))))
 	defer closeFunc()
@@ -309,7 +311,7 @@ func (t *testSuiteSEBAKStorageProvider) TestGetIteratorLimit() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
 
-	st := NewSEBAKStorage(p)
+	st := NewStorage(p)
 
 	limit := 3
 	iterFunc, closeFunc := st.GetIterator("", sebakstorage.NewDefaultListOptions(false, nil, uint64(limit)))
@@ -338,7 +340,7 @@ func (t *testSuiteSEBAKStorageProvider) TestGetIteratorLimitReverse() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
 
-	st := NewSEBAKStorage(p)
+	st := NewStorage(p)
 
 	limit := 3
 	iterFunc, closeFunc := st.GetIterator("", sebakstorage.NewDefaultListOptions(true, nil, uint64(limit)))
@@ -368,7 +370,7 @@ func (t *testSuiteSEBAKStorageProvider) TestGetIteratorOverLimit() {
 	p.SetItems(t.makeItems(5))
 	p.Limit = 3
 
-	st := NewSEBAKStorage(p)
+	st := NewStorage(p)
 
 	iterFunc, closeFunc := st.GetIterator("", sebakstorage.NewDefaultListOptions(false, nil, 1000))
 	defer closeFunc()

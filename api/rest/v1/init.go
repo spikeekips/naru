@@ -10,13 +10,13 @@ var log logging.Logger = logging.New("module", "rest")
 var httpLog logging.Logger = logging.New("module", "rest")
 
 func init() {
-	common.SetLogging(common.DefaultLogLevel, common.DefaultLogHandler, log)
+	common.SetLoggingWithLogger(common.DefaultLogLevel, common.DefaultLogHandler, log)
 }
 
 func SetLogging(level logging.Lvl, handler logging.Handler) {
-	common.SetLogging(level, handler, log)
+	common.SetLoggingWithLogger(level, handler, log)
 }
 
 func SetHTTPLogging(level logging.Lvl, handler logging.Handler) {
-	common.SetLogging(level, handler, httpLog)
+	common.SetLoggingWithLogger(level, handler, httpLog)
 }

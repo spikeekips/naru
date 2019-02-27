@@ -81,8 +81,9 @@ func removeBlock(hash string, chanError chan<- error) (err error) {
 	}
 
 	confirmedPrefix := fmt.Sprintf(
-		"%s%s-%s%s",
-		sebakcommon.BlockPrefixConfirmed, block.ProposedTime,
+		"%s%s-%s",
+		sebakcommon.BlockPrefixConfirmed,
+		block.ProposedTime,
 		sebakcommon.EncodeUint64ToByteSlice(block.Height),
 	)
 	iterFunc, closeFunc := st.GetIterator(

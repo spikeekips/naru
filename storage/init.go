@@ -9,9 +9,9 @@ import (
 var log logging.Logger = logging.New("module", "storage")
 
 func init() {
-	common.SetLogging(common.DefaultLogLevel, common.DefaultLogHandler, log)
+	common.SetLoggingWithLogger(common.DefaultLogLevel, common.DefaultLogHandler, log)
 }
 
 func SetLogging(level logging.Lvl, handler logging.Handler) {
-	common.SetLogging(level, handler, log)
+	common.SetLoggingWithLogger(level, handler, log)
 }
