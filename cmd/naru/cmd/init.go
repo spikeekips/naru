@@ -12,6 +12,7 @@ import (
 	restv1 "github.com/spikeekips/naru/api/rest/v1"
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/digest"
+	"github.com/spikeekips/naru/sebak"
 	"github.com/spikeekips/naru/storage"
 )
 
@@ -19,6 +20,10 @@ var (
 	log     logging.Logger = logging.New("module", "main")
 	verbose bool
 )
+
+func Log() logging.Logger {
+	return log
+}
 
 var rootCmd = &cobra.Command{
 	Use:   os.Args[0],
@@ -28,10 +33,6 @@ var rootCmd = &cobra.Command{
 			c.Usage()
 		}
 	},
-}
-
-func SetLogging(level logging.Lvl, handler logging.Handler) {
-	common.SetLoggingWithLogger(level, handler, log)
 }
 
 func init() {
@@ -44,29 +45,27 @@ func init() {
 		}
 	}
 
-	var logHandler logging.Handler
-	if logFormat == "terminal" {
-		var logFormatter logging.Format
-		if isatty.IsTerminal(os.Stdout.Fd()) {
-			logFormatter = logging.TerminalFormat()
-		} else {
-			logFormatter = logging.LogfmtFormat()
-		}
-		logHandler = logging.StreamHandler(os.Stdout, logFormatter)
-	} else {
-		logHandler = common.DefaultLogHandler
-	}
-
-	lvl := common.DefaultLogLevel
 	if verbose {
-		lvl = logging.LvlDebug
-		common.SetLogging(lvl, logHandler)
-		digest.SetLogging(lvl, logHandler)
-		restv1.SetLogging(lvl, logHandler)
-		storage.SetLogging(lvl, logHandler)
-	}
+		var logHandler logging.Handler
+		if logFormat == "terminal" {
+			var logFormatter logging.Format
+			if isatty.IsTerminal(os.Stdout.Fd()) {
+				logFormatter = logging.TerminalFormat()
+			} else {
+				logFormatter = logging.LogfmtFormat()
+			}
+			logHandler = logging.StreamHandler(os.Stdout, logFormatter)
+		} else {
+			logHandler = common.DefaultLogHandler
+		}
 
-	SetLogging(lvl, logHandler)
+		Log().SetHandler(logging.LvlFilterHandler(logging.LvlDebug, logHandler))
+		common.Log().SetHandler(logging.LvlFilterHandler(logging.LvlDebug, logHandler))
+		digest.Log().SetHandler(logging.LvlFilterHandler(logging.LvlDebug, logHandler))
+		restv1.Log().SetHandler(logging.LvlFilterHandler(logging.LvlDebug, logHandler))
+		sebak.Log().SetHandler(logging.LvlFilterHandler(logging.LvlDebug, logHandler))
+		storage.Log().SetHandler(logging.LvlFilterHandler(logging.LvlDebug, logHandler))
+	}
 }
 
 func Execute() {

@@ -82,8 +82,8 @@ func (n TLSConfig) ParseKey(i string) (string, error) {
 
 type NetworkLogs struct {
 	cvc.BaseGroup
-	HTTP  *Log
-	Error *Log
+	HTTP  *LogConfig
+	Error *LogConfig
 }
 
 func NewNetworkLogs() *NetworkLogs {

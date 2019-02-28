@@ -10,6 +10,7 @@ import (
 	sebakerrors "boscoin.io/sebak/lib/errors"
 	sebaknode "boscoin.io/sebak/lib/node"
 
+	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/sebak"
 	"github.com/spikeekips/naru/storage"
 	"github.com/spikeekips/naru/storage/item"
@@ -166,7 +167,8 @@ func (d *InitializeDigestRunner) Run() (err error) {
 
 type WatchDigestRunner struct {
 	*BaseDigestRunner
-	start uint64
+	start    uint64
+	interval time.Duration
 }
 
 func NewWatchDigestRunner(st *storage.Storage, sst *sebak.Storage, sebakInfo sebaknode.NodeInfo, start uint64) *WatchDigestRunner {
@@ -178,6 +180,14 @@ func NewWatchDigestRunner(st *storage.Storage, sst *sebak.Storage, sebakInfo seb
 		},
 		start: start,
 	}
+}
+
+func (w *WatchDigestRunner) SetInterval(i time.Duration) {
+	if i < 1 {
+		i = common.DefaultDigestWatchInterval
+	}
+
+	w.interval = i
 }
 
 // Run runs to watch and follow up the last remote block from sebak. By default,
@@ -277,11 +287,10 @@ func (w *WatchDigestRunner) watchLatestBlocks(lastBlock uint64) {
 	for {
 		if err := w.watchLatestBlock(lastBlock); err != nil {
 			log.Error("something wrong watchLatestBlock", "error", err)
-			time.Sleep(time.Second * 2)
+			time.Sleep(w.interval)
 			continue
 		}
-
-		time.Sleep(time.Millisecond * 300)
+		time.Sleep(w.interval)
 	}
 }
 

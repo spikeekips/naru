@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -9,47 +10,40 @@ import (
 	isatty "github.com/mattn/go-isatty"
 	"github.com/spikeekips/cvc"
 
-	restv1 "github.com/spikeekips/naru/api/rest/v1"
 	"github.com/spikeekips/naru/common"
-	"github.com/spikeekips/naru/digest"
-	"github.com/spikeekips/naru/sebak"
-	"github.com/spikeekips/naru/storage"
 )
 
-type Log struct {
+type LogConfig struct {
 	cvc.BaseGroup
-	File   string      `flag-help:"set log file"`
-	Format string      `flag-help:"log format"`
-	Level  logging.Lvl `flag-help:"log level {debug error warn info crit}"`
+	File        string `flag-help:"set log file"`
+	Format      string `flag-help:"log format"`
+	LevelString string `flag:"level" flag-help:"log level {debug error warn info crit}"`
 }
 
-func NewLog() *Log {
-	return &Log{
-		Format: common.DefaultLogFormat,
-		Level:  common.DefaultLogLevel,
+func NewLog() *LogConfig {
+	return &LogConfig{
+		Format:      common.DefaultLogFormat,
+		LevelString: common.DefaultLogLevel.String(),
 	}
 }
 
-func (l *Log) FlagValueLevel() string {
-	s := l.Level.String()
-	switch l.Level {
-	case logging.LvlError:
-		s = "error"
-	case logging.LvlDebug:
-		s = "debug"
+func (l LogConfig) ParseLevelString(v string) (string, error) {
+	_, err := logging.LvlFromString(v)
+	return v, err
+}
+
+func formatLogLevel(s string) string {
+	switch s {
+	case "eror":
+		return "error"
 	}
 
 	return s
 }
 
-func (l Log) ParseLevel(v string) (logging.Lvl, error) {
-	return logging.LvlFromString(v)
-}
-
-func (l Log) ParseFormat(v string) (string, error) {
+func (l LogConfig) ParseFormat(v string) (string, error) {
 	switch v {
-	case "terminal":
-	case "json":
+	case "terminal", "json":
 	default:
 		return "", fmt.Errorf("invalid log format, '%s'", v)
 	}
@@ -57,7 +51,66 @@ func (l Log) ParseFormat(v string) (string, error) {
 	return v, nil
 }
 
-func (l *Log) Formatter() (logging.Format, error) {
+func (l *LogConfig) FlagValueFormat() string {
+	if len(l.Format) < 1 {
+		return common.DefaultLogFormat
+	}
+
+	return l.Format
+}
+
+func (l *LogConfig) FlagValueLevelString() string {
+	if len(l.LevelString) < 1 {
+		return formatLogLevel(common.DefaultLogLevel.String())
+	}
+
+	return l.LevelString
+}
+
+func (l *LogConfig) Level() logging.Lvl {
+	if len(l.LevelString) < 1 {
+		return common.DefaultLogLevel
+	}
+
+	lvl, err := logging.LvlFromString(l.LevelString)
+	if err != nil {
+		log.Warn("invalid log level found", "level", l.LevelString)
+
+		return logging.LvlCrit
+	}
+
+	return lvl
+}
+
+func (l LogConfig) String() string {
+	b, _ := json.Marshal(l)
+	return string(b)
+}
+
+func (l *LogConfig) Validate() error {
+	if len(l.LevelString) < 1 {
+		return nil
+	}
+
+	if len(l.File) > 0 {
+		if _, err := logging.FileHandler(l.File, logging.TerminalFormat()); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (l *LogConfig) ValidateFomatter() error {
+	switch l.Format {
+	case "", "terminal", "json":
+		return nil
+	}
+
+	return fmt.Errorf("invalid log format, '%s'", l.Format)
+}
+
+func (l *LogConfig) Formatter() logging.Format {
 	var logFormatter logging.Format
 	switch l.Format {
 	case "terminal":
@@ -66,109 +119,72 @@ func (l *Log) Formatter() (logging.Format, error) {
 		} else {
 			logFormatter = logging.LogfmtFormat()
 		}
-	case "json":
+	case "", "json":
 		logFormatter = sebakcommon.JsonFormatEx(false, true)
-	default:
-		err := fmt.Errorf("invalid log format, '%s'", l.Format)
-		return nil, err
 	}
 
-	return logFormatter, nil
+	return logFormatter
 }
 
-func (l *Log) Handler() (logging.Handler, error) {
-	var handler logging.Handler
-	formatter, err := l.Formatter()
-	if err != nil {
-		return nil, err
+func (l *LogConfig) Handler() logging.Handler {
+	if l == nil {
+		return common.DefaultLogHandler
 	}
+
+	var handler logging.Handler
+	formatter := l.Formatter()
 
 	if len(l.File) < 1 {
 		handler = logging.StreamHandler(os.Stdout, formatter)
 	} else {
-		lh, err := logging.FileHandler(l.File, formatter)
-		if err != nil {
-			return nil, err
-		}
-		handler = lh
+		handler, _ = logging.FileHandler(l.File, formatter)
 	}
 
-	if l.Level == logging.LvlDebug { // only debug produces `caller` data
+	if l.Level() == logging.LvlDebug { // only debug produces `caller` data
 		handler = logging.CallerFileHandler(handler)
 	}
 
-	return handler, nil
+	return handler
 }
 
-func (l *Log) SetLogging(f func(logging.Lvl, logging.Handler)) error {
-	handler, err := l.Handler()
-	if err != nil {
-		return err
-	}
-
-	f(l.Level, handler)
-
-	return nil
+func (l *LogConfig) SetLogger(logger logging.Logger) {
+	logger.SetHandler(logging.LvlFilterHandler(l.Level(), l.Handler()))
 }
 
-func (l *Log) SetLoggingWithDefault(f func(logging.Lvl, logging.Handler), lvl logging.Lvl, handler logging.Handler) error {
+func (l *LogConfig) Merge(c *LogConfig) {
 	if l == nil {
-		f(lvl, handler)
-		return nil
-	}
-	if _, err := l.Formatter(); err != nil {
-		f(lvl, handler)
-		return nil
+		l = &LogConfig{}
 	}
 
-	return l.SetLogging(f)
+	file := l.File
+	format := l.Format
+	levelString := l.LevelString
+
+	if len(file) < 1 {
+		l.File = c.File
+	}
+	if len(format) < 1 {
+		l.Format = c.Format
+	}
+	if len(levelString) < 1 {
+		l.LevelString = c.LevelString
+	}
 }
 
 type Logs struct {
 	cvc.BaseGroup
-	Global  *Log
+	Global  *LogConfig
 	Package *PackageLog
-}
-
-func (l *Logs) SetAllLogging(logger logging.Logger) error {
-	lvl := l.Global.Level
-	handler, err := l.Global.Handler()
-	if err != nil {
-		return err
-	}
-
-	common.SetLoggingWithLogger(lvl, handler, logger)
-
-	if err := l.Package.Config.SetLoggingWithDefault(SetLogging, lvl, handler); err != nil {
-		return err
-	}
-	if err := l.Package.Common.SetLoggingWithDefault(common.SetLogging, lvl, handler); err != nil {
-		return err
-	}
-	if err := l.Package.Digest.SetLoggingWithDefault(digest.SetLogging, lvl, handler); err != nil {
-		return err
-	}
-	if err := l.Package.Restv1.SetLoggingWithDefault(restv1.SetLogging, lvl, handler); err != nil {
-		return err
-	}
-	if err := l.Package.SEBAK.SetLoggingWithDefault(sebak.SetLogging, lvl, handler); err != nil {
-		return err
-	}
-	if err := l.Package.Storage.SetLoggingWithDefault(storage.SetLogging, lvl, handler); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 type PackageLog struct {
 	cvc.BaseGroup
-	Config  *Log
-	Common  *Log
-	Digest  *Log
-	Restv1  *Log
-	Storage *Log
-	SEBAK   *Log
+	Config  *LogConfig
+	Common  *LogConfig
+	Digest  *LogConfig
+	Restv1  *LogConfig
+	Storage *LogConfig
+	SEBAK   *LogConfig
 }
 
 func NewLogs() *Logs {
@@ -176,4 +192,19 @@ func NewLogs() *Logs {
 		Global:  NewLog(),
 		Package: &PackageLog{},
 	}
+}
+
+func (l *Logs) Validate() error {
+	if l.Global == nil {
+		l.Global = NewLog()
+	}
+
+	l.Package.Config.Merge(l.Global)
+	l.Package.Common.Merge(l.Global)
+	l.Package.Digest.Merge(l.Global)
+	l.Package.Restv1.Merge(l.Global)
+	l.Package.Storage.Merge(l.Global)
+	l.Package.SEBAK.Merge(l.Global)
+
+	return nil
 }

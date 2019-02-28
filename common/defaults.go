@@ -2,6 +2,7 @@ package common
 
 import (
 	"os"
+	"time"
 
 	logging "github.com/inconshreveable/log15"
 
@@ -18,9 +19,10 @@ var (
 	DefaultSEBAKJSONRpc        *sebakcommon.Endpoint
 	DefaultBindString          string = "http://0.0.0.0:23456"
 	DefaultBind                *sebakcommon.Endpoint
-	DefaultTLSCert             string = "naru.crt"
-	DefaultTLSKey              string = "naru.key"
-	DefaultStoragePath         string = "db"
+	DefaultTLSCert             string        = "naru.crt"
+	DefaultTLSKey              string        = "naru.key"
+	DefaultStoragePath         string        = "db"
+	DefaultDigestWatchInterval time.Duration = time.Millisecond * 1000
 )
 
 func init() {

@@ -23,7 +23,7 @@ type configFileConfig struct {
 
 type configCheckConfig struct {
 	cvc.BaseGroup
-	Log     *config.Log
+	Log     *config.LogConfig
 	Verbose bool
 }
 
@@ -66,6 +66,7 @@ func init() {
 		configCmd.AddCommand(configFileCmd)
 
 		configFileManager = cvc.NewManager(
+			"naru",
 			&configFileConfig{Format: "yml"},
 			configFileCmd,
 			viper.New(),
@@ -79,11 +80,12 @@ func init() {
 			Args:  cobra.MinimumNArgs(1),
 			Run: func(c *cobra.Command, args []string) {
 				config := configCheckManager.Config().(*configCheckConfig)
-				config.Log.SetLogging(cvc.SetLogging)
-				config.Log.SetLogging(common.SetLogging)
-				config.Log.SetLogging(digest.SetLogging)
-				config.Log.SetLogging(sebak.SetLogging)
-				config.Log.SetLogging(storage.SetLogging)
+				//config.Log.SetLogger(cvc.SetLogging)
+				config.Log.SetLogger(Log())
+				config.Log.SetLogger(common.Log())
+				config.Log.SetLogger(digest.Log())
+				config.Log.SetLogger(sebak.Log())
+				config.Log.SetLogger(storage.Log())
 
 				for _, f := range args {
 					log.Info("checking config file", "file", f)
@@ -102,6 +104,7 @@ func init() {
 		configCmd.AddCommand(configCheckCmd)
 
 		configCheckManager = cvc.NewManager(
+			"naru",
 			&configCheckConfig{Log: config.NewLog()},
 			configCheckCmd,
 			viper.New(),

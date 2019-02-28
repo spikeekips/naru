@@ -50,19 +50,12 @@ func init() {
 				cmdcommon.PrintError(c, err)
 			}
 
-			if err := sc.Log.SetAllLogging(log); err != nil {
-				cmdcommon.PrintError(c, err)
-			}
-
-			log.Info("start naru server")
-
-			if _, err := serverConfigManager.Merge(); err != nil {
-				log.Error("failed to load config", "error", err)
-				cmdcommon.PrintError(c, err)
-			}
-
 			log.Debug("config merged", serverConfigManager.ConfigPprint()...)
 			log.Info("config merged")
+
+			SetAllLogging(sc.Log)
+
+			log.Info("start naru server")
 
 			if err := runServer(sc); err != nil {
 				log.Error("exited with error", "error", err)
@@ -73,13 +66,13 @@ func init() {
 
 	sc = &ServerConfig{
 		SEBAK:   config.NewSEBAK(),
-		Digest:  &config.Digest{},
+		Digest:  config.NewDigest(),
 		System:  config.NewSystem(),
 		Network: config.NewNetwork(),
 		Storage: config.NewStorage(),
 		Log:     config.NewLogs(),
 	}
-	serverConfigManager = cvc.NewManager(sc, serverCmd, viper.New())
+	serverConfigManager = cvc.NewManager("naru", sc, serverCmd, viper.New())
 }
 
 func runServer(sc *ServerConfig) error {
@@ -141,7 +134,7 @@ func runServer(sc *ServerConfig) error {
 	// start network layers
 	cb := cachebackend.NewGoCache()
 
-	restServer := restv1.NewServer(sc.Network.Bind, st, sst, cb, nodeInfo)
+	restServer := restv1.NewServer(sc.Network, st, sst, cb, nodeInfo)
 	if sc.System.Profile {
 		restServer.AddHandler("/debug/pprof/", pprof.Index)
 		restServer.AddHandler("/debug/pprof/cmdline", pprof.Cmdline)
@@ -152,6 +145,7 @@ func runServer(sc *ServerConfig) error {
 
 	if err := restServer.Start(); err != nil {
 		log.Crit("failed to run restServer", "error", err)
+		return err
 	}
 
 	return nil

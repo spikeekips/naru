@@ -17,6 +17,7 @@ import (
 
 	"github.com/spikeekips/naru/api/rest"
 	cachebackend "github.com/spikeekips/naru/cache/backend"
+	"github.com/spikeekips/naru/config"
 )
 
 type Server struct {
@@ -30,9 +31,12 @@ type Server struct {
 	router    *mux.Router
 }
 
-func NewServer(bind *sebakcommon.Endpoint, st *storage.Storage, sst *sebak.Storage, cb cachebackend.Backend, sebakInfo sebaknode.NodeInfo) *Server {
+func NewServer(nc *config.Network, st *storage.Storage, sst *sebak.Storage, cb cachebackend.Backend, sebakInfo sebaknode.NodeInfo) *Server {
+	httpLog := logging.New("module", "restv1")
+	nc.Log.HTTP.SetLogger(httpLog)
+
 	core := &http.Server{
-		Addr: bind.Host,
+		Addr: nc.Bind.Host,
 		/* TODO from config
 		ReadTimeout:       config.ReadTimeout,
 		ReadHeaderTimeout: config.ReadHeaderTimeout,
@@ -54,7 +58,7 @@ func NewServer(bind *sebakcommon.Endpoint, st *storage.Storage, sst *sebak.Stora
 	cch := cache.NewCache("api", cb)
 
 	server := &Server{
-		bind:      bind,
+		bind:      nc.Bind,
 		st:        st,
 		sst:       sst,
 		cch:       cch,

@@ -37,3 +37,11 @@ func (s *Storage) StorageConfig() *sebakstorage.Config {
 
 	return c
 }
+
+func (s *Storage) FlagValuePath() string {
+	n, err := filepath.Rel(common.CurrentDirectory, s.Path)
+	if err != nil {
+		return s.Path
+	}
+	return n
+}

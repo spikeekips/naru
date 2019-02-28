@@ -39,16 +39,17 @@ func init() {
 		Long: "digest blocks from SEBAK",
 		Run: func(c *cobra.Command, args []string) {
 			if len(args) > 0 {
-				serverConfigManager.SetViperConfigFile(args...)
+				digestConfigManager.SetViperConfigFile(args...)
 			}
 
 			if _, err := digestConfigManager.Merge(); err != nil {
 				cmdcommon.PrintError(c, err)
 			}
 
-			if err := dc.Log.SetAllLogging(log); err != nil {
-				cmdcommon.PrintError(c, err)
-			}
+			log.Debug("config merged", digestConfigManager.ConfigPprint()...)
+			log.Info("config merged")
+
+			SetAllLogging(dc.Log)
 
 			log.Info("start naru digest")
 
@@ -63,13 +64,13 @@ func init() {
 
 	dc = &digestConfig{
 		SEBAK:   config.NewSEBAK(),
-		Digest:  &config.Digest{},
+		Digest:  config.NewDigest(),
 		System:  config.NewSystem(),
 		Network: config.NewNetwork(),
 		Storage: config.NewStorage(),
 		Log:     config.NewLogs(),
 	}
-	digestConfigManager = cvc.NewManager(dc, digestCmd, viper.New())
+	digestConfigManager = cvc.NewManager("naru", dc, digestCmd, viper.New())
 
 }
 
@@ -107,6 +108,7 @@ func runDigest(dc *digestConfig) error {
 
 	if dc.Digest.Watch {
 		watchRunner := digest.NewWatchDigestRunner(st, sst, nodeInfo, runner.StoredRemoteBlock().Height+1)
+		watchRunner.SetInterval(dc.Digest.WatchInterval)
 		if err = watchRunner.Run(true); err != nil {
 			return err
 		}
