@@ -93,7 +93,7 @@ func (t *testMongoStorage) TestInsert() {
 	var items []testMongoStorageItem
 	for i := uint64(0); i < 5; i++ {
 		item := testMongoStorageItem{
-			A: "\x00\x10-" + common.RandomUUID(),
+			A: "\x00\x10-" + common.SequentialUUID(),
 			B: int(i),
 			C: []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
 		}
@@ -106,7 +106,7 @@ func (t *testMongoStorage) TestInsert() {
 	{ // other records
 		for i := uint64(0); i < 3; i++ {
 			item := testMongoStorageItem{
-				A: "BBB-" + common.RandomUUID(),
+				A: "BBB-" + common.SequentialUUID(),
 				B: int(i),
 				C: []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
 			}
@@ -250,6 +250,281 @@ func (t *testMongoStorage) TestDeleteBatch() {
 		found, err := t.s.Has(item.A)
 		t.NoError(err)
 		t.False(found)
+	}
+}
+
+func (t *testMongoStorage) TestIteratorLimit() {
+	prefix := "\x00\x10-=---"
+
+	var items []testMongoStorageItem
+	for i := uint64(0); i < 5; i++ {
+		item := testMongoStorageItem{
+			A: prefix + common.SequentialUUID(),
+			B: int(i),
+			C: []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
+		}
+		err := t.s.Insert(item.A, item)
+		t.NoError(err)
+
+		items = append(items, item)
+	}
+
+	{ // other records
+		for i := uint64(0); i < 3; i++ {
+			item := testMongoStorageItem{
+				A: "BBB-" + common.SequentialUUID(),
+				B: int(i),
+				C: []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
+			}
+			err := t.s.Insert(item.A, item)
+			t.NoError(err)
+		}
+	}
+
+	{ // reverse=false, no cursor, 3 limited
+		limit := 3
+		opt := newstorage.NewDefaultListOptions(false, nil, uint64(limit))
+		iter, cls := t.s.Iterator(prefix, testMongoStorageItem{}, opt)
+
+		var records []newstorage.Record
+		for {
+			record, next := iter()
+			if !next {
+				break
+			}
+
+			records = append(records, record)
+		}
+		cls()
+
+		t.Equal(limit, len(records))
+
+		for n, item := range items[:limit] {
+			t.Equal(item.A, records[n].Value.(testMongoStorageItem).A)
+			t.Equal(item.B, records[n].Value.(testMongoStorageItem).B)
+			for m, i := range item.C {
+				t.Equal(i, records[n].Value.(testMongoStorageItem).C[m])
+			}
+		}
+	}
+
+	{ // reverse=true, no cursor, 3 limited
+		limit := 3
+		opt := newstorage.NewDefaultListOptions(true, nil, uint64(limit))
+		iter, cls := t.s.Iterator(prefix, testMongoStorageItem{}, opt)
+
+		var records []newstorage.Record
+		for {
+			record, next := iter()
+			if !next {
+				break
+			}
+
+			records = append(records, record)
+		}
+		cls()
+
+		t.Equal(limit, len(records))
+
+		for n, item := range items[len(items)-limit : limit] {
+			t.Equal(item.A, records[limit-n-1].Value.(testMongoStorageItem).A)
+			t.Equal(item.B, records[limit-n-1].Value.(testMongoStorageItem).B)
+			for m, i := range item.C {
+				t.Equal(i, records[limit-n-1].Value.(testMongoStorageItem).C[m])
+			}
+		}
+	}
+
+	{ // reverse=true, 4th cursor, 10 limited
+		cursorItem := items[4]
+		limit := 10
+		opt := newstorage.NewDefaultListOptions(true, []byte(cursorItem.A), uint64(limit))
+		iter, cls := t.s.Iterator(prefix, testMongoStorageItem{}, opt)
+
+		var records []newstorage.Record
+		for {
+			record, next := iter()
+			if !next {
+				break
+			}
+
+			records = append(records, record)
+		}
+		cls()
+
+		t.Equal(4, len(records))
+
+		for n, item := range items[:4] {
+			t.Equal(item.A, records[3-n].Value.(testMongoStorageItem).A)
+			t.Equal(item.B, records[3-n].Value.(testMongoStorageItem).B)
+			for m, i := range item.C {
+				t.Equal(i, records[3-n].Value.(testMongoStorageItem).C[m])
+			}
+		}
+	}
+}
+
+func (t *testMongoStorage) TestIteratorCursor() {
+	prefix := "\x00\x10-=---"
+
+	var items []testMongoStorageItem
+	for i := uint64(0); i < 5; i++ {
+		item := testMongoStorageItem{
+			A: prefix + common.SequentialUUID(),
+			B: int(i),
+			C: []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
+		}
+		err := t.s.Insert(item.A, item)
+		t.NoError(err)
+
+		items = append(items, item)
+	}
+
+	{ // other records
+		for i := uint64(0); i < 3; i++ {
+			item := testMongoStorageItem{
+				A: "BBB-" + common.SequentialUUID(),
+				B: int(i),
+				C: []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
+			}
+			err := t.s.Insert(item.A, item)
+			t.NoError(err)
+		}
+	}
+
+	{ // reverse=false, 3rd cursor, unlimited
+		cursorItem := items[2]
+		opt := newstorage.NewDefaultListOptions(false, []byte(cursorItem.A), 0)
+		iter, cls := t.s.Iterator(prefix, testMongoStorageItem{}, opt)
+
+		var records []newstorage.Record
+		for {
+			record, next := iter()
+			if !next {
+				break
+			}
+
+			records = append(records, record)
+		}
+		cls()
+
+		t.Equal(2, len(records))
+
+		for n, item := range items[3:] {
+			t.Equal(item.A, records[n].Value.(testMongoStorageItem).A)
+			t.Equal(item.B, records[n].Value.(testMongoStorageItem).B)
+			for m, i := range item.C {
+				t.Equal(i, records[n].Value.(testMongoStorageItem).C[m])
+			}
+		}
+	}
+
+	{ // reverse=true, 3rd cursor, unlimited
+		cursorItem := items[2]
+		opt := newstorage.NewDefaultListOptions(true, []byte(cursorItem.A), 0)
+		iter, cls := t.s.Iterator(prefix, testMongoStorageItem{}, opt)
+
+		var records []newstorage.Record
+		for {
+			record, next := iter()
+			if !next {
+				break
+			}
+
+			records = append(records, record)
+		}
+		cls()
+
+		t.Equal(2, len(records))
+
+		for n, item := range items[:2] {
+			t.Equal(item.A, records[1-n].Value.(testMongoStorageItem).A)
+			t.Equal(item.B, records[1-n].Value.(testMongoStorageItem).B)
+			for m, i := range item.C {
+				t.Equal(i, records[1-n].Value.(testMongoStorageItem).C[m])
+			}
+		}
+	}
+}
+
+func (t *testMongoStorage) TestIteratorOptions() {
+	prefix := "\x00\x10-=---"
+
+	var items []testMongoStorageItem
+	for i := uint64(0); i < 5; i++ {
+		item := testMongoStorageItem{
+			A: prefix + common.SequentialUUID(),
+			B: int(i),
+			C: []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
+		}
+		err := t.s.Insert(item.A, item)
+		t.NoError(err)
+
+		items = append(items, item)
+	}
+
+	{ // other records
+		for i := uint64(0); i < 3; i++ {
+			item := testMongoStorageItem{
+				A: "BBB-" + common.SequentialUUID(),
+				B: int(i),
+				C: []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
+			}
+			err := t.s.Insert(item.A, item)
+			t.NoError(err)
+		}
+	}
+
+	{ // reverse=false, no cursor, unlimited
+		opt := newstorage.NewDefaultListOptions(false, nil, 0)
+		iter, cls := t.s.Iterator(prefix, testMongoStorageItem{}, opt)
+
+		var records []newstorage.Record
+		for {
+			record, next := iter()
+			if !next {
+				break
+			}
+
+			records = append(records, record)
+		}
+		cls()
+
+		t.Equal(len(items), len(records))
+
+		for n, item := range items {
+			t.Equal(item.A, records[n].Value.(testMongoStorageItem).A)
+			t.Equal(item.B, records[n].Value.(testMongoStorageItem).B)
+			for m, i := range item.C {
+				t.Equal(i, records[n].Value.(testMongoStorageItem).C[m])
+			}
+		}
+	}
+
+	{ // reverse=true, no cursor, unlimited
+		opt := newstorage.NewDefaultListOptions(true, nil, 0)
+		iter, cls := t.s.Iterator(prefix, testMongoStorageItem{}, opt)
+
+		var records []newstorage.Record
+		for {
+			record, next := iter()
+			if !next {
+				break
+			}
+
+			records = append(records, record)
+		}
+		cls()
+
+		t.Equal(len(items), len(records))
+
+		for n, item := range items {
+			t.Equal(item.A, records[len(items)-n-1].Value.(testMongoStorageItem).A)
+			t.Equal(item.B, records[len(items)-n-1].Value.(testMongoStorageItem).B)
+			for m, i := range item.C {
+				t.Equal(i, records[len(items)-n-1].Value.(testMongoStorageItem).C[m])
+			}
+		}
 	}
 }
 

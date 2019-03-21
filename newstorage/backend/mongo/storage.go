@@ -79,17 +79,6 @@ func (b *Storage) Batch() newstorage.BatchStorage {
 	return NewBatch(b)
 }
 
-func (b *Storage) Write() error {
-	// TODO remove
-	//return newstorage.NotBatchStorage.New()
-	return nil
-}
-
-func (b *Storage) Cancel() error {
-	// TODO remove
-	return nil
-}
-
 func (b *Storage) Has(k string) (bool, error) {
 	q := bson.M{"_k": resolveKey(k)}
 	cur, err := b.Collection().Find(
@@ -145,19 +134,35 @@ func (b *Storage) Get(k string, v interface{}) error {
 	return err
 }
 
-func (b *Storage) Iterator(prefix string, v interface{}, op newstorage.ListOptions) (func() (newstorage.Record, bool), func()) {
+func (b *Storage) Iterator(prefix string, v interface{}, opt newstorage.ListOptions) (func() (newstorage.Record, bool), func()) {
 	q := bson.M{"_k": bson.M{"$regex": "^" + regexp.QuoteMeta(resolveKey(prefix))}}
 
 	reverse := 1
-	if op.Reverse() {
+	if opt.Reverse() {
 		reverse = -1
 	}
 
-	mop := options.Find().
-		SetLimit(int64(op.Limit())).
+	if len(opt.Cursor()) > 0 {
+		var dir string
+		if opt.Reverse() {
+			dir = "$lt"
+		} else {
+			dir = "$gt"
+		}
+
+		q = bson.M{
+			"$and": bson.A{
+				q,
+				bson.M{"_k": bson.M{dir: resolveKey(string(opt.Cursor()))}},
+			},
+		}
+	}
+
+	mopt := options.Find().
+		SetLimit(int64(opt.Limit())).
 		SetSort(bson.M{"_k": reverse})
 
-	cur, err := b.Collection().Find(context.Background(), q, mop)
+	cur, err := b.Collection().Find(context.Background(), q, mopt)
 
 	return func() (newstorage.Record, bool) {
 			// TODO err should be returned
