@@ -10,22 +10,22 @@ import (
 )
 
 func EventSync() {
-	newstorage.Observer.Sync("OnSyncSaveAccount", OnSyncSaveAccount)
-	newstorage.Observer.Sync("OnSyncSaveBlock", OnSyncSaveBlock)
-	newstorage.Observer.Sync("OnSyncSaveTransaction", OnSyncSaveTransaction)
-	newstorage.Observer.Sync("OnSyncSaveOperation", OnSyncSaveOperation)
+	newstorage.Observer.Sync("OnAfterSaveAccount", OnAfterSaveAccount)
+	newstorage.Observer.Sync("OnAfterSaveBlock", OnAfterSaveBlock)
+	newstorage.Observer.Sync("OnAfterSaveTransaction", OnAfterSaveTransaction)
+	newstorage.Observer.Sync("OnAfterSaveOperation", OnAfterSaveOperation)
 }
 
-func OnSyncSaveAccount(st newstorage.Storage, account item.Account) {
+func OnAfterSaveAccount(st newstorage.Storage, account item.Account) {
 }
 
-func OnSyncSaveBlock(st newstorage.Storage, block item.Block) {
+func OnAfterSaveBlock(st newstorage.Storage, block item.Block) {
 	if err := st.Insert(item.GetBlockHeightKey(block.Height), block.Hash); err != nil {
 		return
 	}
 }
 
-func OnSyncSaveTransaction(st newstorage.Storage, transaction item.Transaction, tx sebaktransaction.Transaction, block item.Block) {
+func OnAfterSaveTransaction(st newstorage.Storage, transaction item.Transaction, tx sebaktransaction.Transaction, block item.Block) {
 	if err := st.Insert(item.GetTransactionBlockKey(block.Height), transaction.Hash); err != nil {
 		return
 	}
@@ -40,7 +40,7 @@ func OnSyncSaveTransaction(st newstorage.Storage, transaction item.Transaction, 
 	}
 }
 
-func OnSyncSaveOperation(st newstorage.Storage, operation item.Operation) {
+func OnAfterSaveOperation(st newstorage.Storage, operation item.Operation) {
 	if err := st.Insert(item.GetOperationAccountRelatedKey(operation.Source, operation.Height), operation.Hash); err != nil {
 		return
 	}

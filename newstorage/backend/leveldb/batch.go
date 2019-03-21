@@ -1,6 +1,7 @@
 package leveldbstorage
 
 import (
+	"strings"
 	"sync"
 
 	"boscoin.io/sebak/lib/errors"
@@ -148,16 +149,42 @@ func (b *Batch) MultipleDelete(keys ...string) error {
 }
 
 func (b *Batch) Write() error {
+	var events []common.EventItem
+	{
+		b.RLock()
+		events = make([]common.EventItem, len(b.events))
+		copy(events, b.events)
+		b.RUnlock()
+	}
+
+	for _, e := range events { // only OnAfterSave event will be triggered
+		var es []string
+		for _, n := range strings.Fields(e.Events) {
+			if !strings.HasPrefix(n, "OnAfterSave") {
+				continue
+			}
+			es = append(es, n)
+		}
+
+		newstorage.Observer.Trigger(strings.Join(es, " "), e.Items...)
+	}
+
 	err := setError(b.s.Core().Write(b.b, nil))
 	if err != nil {
 		return err
 	}
 
-	b.RLock()
-	for _, e := range b.events {
-		newstorage.Observer.Trigger(e.Events, e.Items...)
+	for _, e := range events { // only non-OnAfterSave event will be triggered
+		var events []string
+		for _, n := range strings.Fields(e.Events) {
+			if strings.HasPrefix(n, "OnAfterSave") {
+				continue
+			}
+			events = append(events, n)
+		}
+
+		newstorage.Observer.Trigger(strings.Join(events, " "), e.Items...)
 	}
-	b.RUnlock()
 
 	b.clearEvents()
 	return nil

@@ -23,14 +23,14 @@ func (a Account) Save(st storage.Storage) error {
 		return err
 	} else if found {
 		f = st.Update
-		event = EventUpdateAccount
+		//event = EventUpdateAccount
 	} else {
 		f = st.Insert
-		event = EventNewAccount
+		//event = EventNewAccount
 	}
 	err := f(GetAccountKey(a.Address), a)
 	if err == nil {
-		st.Event("OnSyncSaveAccount "+event, a)
+		st.Event("OnAfterSaveAccount "+event, st, a)
 		return nil
 	}
 

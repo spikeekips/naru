@@ -16,9 +16,9 @@ import (
 	"github.com/spikeekips/naru/config"
 	"github.com/spikeekips/naru/digest"
 	storage "github.com/spikeekips/naru/newstorage"
-	mongostorage "github.com/spikeekips/naru/newstorage/backend/mongo"
+	leveldbstorage "github.com/spikeekips/naru/newstorage/backend/leveldb"
 	"github.com/spikeekips/naru/newstorage/item"
-	mongoitem "github.com/spikeekips/naru/newstorage/item/mongo"
+	leveldbitem "github.com/spikeekips/naru/newstorage/item/leveldb"
 	"github.com/spikeekips/naru/sebak"
 )
 
@@ -95,26 +95,31 @@ func runServer(sc *ServerConfig) error {
 		}
 	}
 
-	//st, err := leveldbstorage.NewStorage(sc.NewStorage.LevelDB)
-	st, err := mongostorage.NewStorage(sc.NewStorage.Mongo)
+	st, err := leveldbstorage.NewStorage(sc.NewStorage.LevelDB)
 	if err != nil {
 		log.Crit("failed to load storage", "config", sc.NewStorage, "error", err)
 		return err
 	}
+	defer st.Close()
+	leveldbitem.EventSync()
 
-	storage.Observer.On(item.EventNewBlock, func(v ...interface{}) {
+	/*
+		st, err := mongostorage.NewStorage(sc.NewStorage.Mongo)
+		if err != nil {
+			log.Crit("failed to load storage", "config", sc.NewStorage, "error", err)
+			return err
+		}
+		defer st.Close()
+		mongoitem.EventSync()
+	*/
+
+	storage.Observer.On(item.EventOnAfterSaveBlock, func(v ...interface{}) {
 		fmt.Println("> new block triggered", v)
 	})
 
-	storage.Observer.On(item.EventNewAccount, func(v ...interface{}) {
-		fmt.Println("> new account triggered", v)
+	storage.Observer.On(item.EventOnAfterSaveAccount, func(v ...interface{}) {
+		fmt.Println("> account saved triggered", v)
 	})
-
-	storage.Observer.On(item.EventUpdateAccount, func(v ...interface{}) {
-		fmt.Println("> account updated", v)
-	})
-
-	mongoitem.EventSync()
 
 	provider := sebak.NewJSONRPCStorageProvider(sc.SEBAK.JSONRpc)
 	sst := sebak.NewStorage(provider)
@@ -128,12 +133,12 @@ func runServer(sc *ServerConfig) error {
 	}
 
 	watchRunner := digest.NewWatchDigestRunner(st, sst, nodeInfo, runner.StoredRemoteBlock().Height+1)
-	//go func() {
-	if err := watchRunner.Run(false); err != nil {
-		log.Crit("failed watchRunner", "error", err)
-		return err
-	}
-	//}()
+	watchRunner.SetInterval(sc.Digest.WatchInterval)
+	go func() {
+		if err := watchRunner.Run(false); err != nil {
+			log.Crit("failed watchRunner", "error", err)
+		}
+	}()
 
 	// start network layers
 	cb := cachebackend.NewGoCache()

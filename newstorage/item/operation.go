@@ -69,7 +69,7 @@ func GetOperationKey(hash string) string {
 func GetOperationAccountRelatedEventKey(address string) string {
 	return fmt.Sprintf(
 		"%s%s%s",
-		EventNewOperation,
+		EventPrefixNewOperation,
 		OperationAccountRelatedPrefix,
 		address,
 	)
@@ -90,22 +90,7 @@ func (o Operation) Save(st storage.Storage) error {
 		return err
 	}
 
-	/*
-		if err := st.Insert(GetOperationAccountRelatedKey(o.Source, o.Height), o.Hash); err != nil {
-			return err
-		}
-
-		event := GetOperationAccountRelatedEventKey(o.Source)
-		if len(o.Target) > 0 {
-			if err := st.Insert(GetOperationAccountRelatedKey(o.Target, o.Height), o.Hash); err != nil {
-				return err
-			}
-
-			event += " " + GetOperationAccountRelatedEventKey(o.Target)
-		}
-	*/
-
-	st.Event("OnSyncSaveOperation", o)
+	st.Event("OnAfterSaveOperation", st, o)
 
 	return nil
 }

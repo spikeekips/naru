@@ -40,35 +40,39 @@ func (b *Batch) Batch() newstorage.BatchStorage {
 	return b
 }
 
-func (b *Batch) allEvents() []common.EventItem {
-	b.RLock()
-	defer b.RUnlock()
-
-	return b.events
-}
-
 func (b *Batch) Write() error {
-	for _, e := range b.allEvents() {
-		var events []string
+	var events []common.EventItem
+	{
+		b.RLock()
+		events = make([]common.EventItem, len(b.events))
+		copy(events, b.events)
+		b.RUnlock()
+	}
+
+	for _, e := range events { // only OnAfterSave event will be triggered
+		var es []string
 		for _, n := range strings.Fields(e.Events) {
-			if !strings.HasPrefix(n, "OnSync") {
+			if !strings.HasPrefix(n, "OnAfterSave") {
 				continue
 			}
-			events = append(events, n)
+			es = append(es, n)
 		}
 
-		items := []interface{}{b}
-		items = append(items, e.Items...)
-		newstorage.Observer.Trigger(strings.Join(events, " "), items...)
+		newstorage.Observer.Trigger(strings.Join(es, " "), e.Items...)
 	}
 
-	b.RLock()
-	result, err := b.s.Collection().BulkWrite(context.Background(), b.ops)
-	if err != nil {
+	var ops []mongo.WriteModel
+	{
+		b.RLock()
+		ops = make([]mongo.WriteModel, len(b.ops))
+		copy(ops, b.ops)
 		b.RUnlock()
+	}
+
+	result, err := b.s.Collection().BulkWrite(context.Background(), ops)
+	if err != nil {
 		return err
 	}
-	b.RUnlock()
 
 	b.log.Debug(
 		"write",
@@ -80,22 +84,17 @@ func (b *Batch) Write() error {
 		"object-ids", result.UpsertedIDs,
 	)
 
-	b.RLock()
-
-	if len(b.events) > 0 {
-		for _, e := range b.events {
-			var events []string
-			for _, n := range strings.Fields(e.Events) {
-				if strings.HasPrefix(n, "OnSync") {
-					continue
-				}
-				events = append(events, n)
+	for _, e := range events { // only non-OnAfterSave event will be triggered
+		var events []string
+		for _, n := range strings.Fields(e.Events) {
+			if strings.HasPrefix(n, "OnAfterSave") {
+				continue
 			}
-
-			newstorage.Observer.Trigger(strings.Join(events, " "), e.Items...)
+			events = append(events, n)
 		}
+
+		newstorage.Observer.Trigger(strings.Join(events, " "), e.Items...)
 	}
-	b.RUnlock()
 
 	b.clearEvents()
 	return nil

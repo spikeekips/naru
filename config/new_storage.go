@@ -61,7 +61,9 @@ func (l LevelDBStorage) ParsePath(s string) (string, error) {
 	case "memory":
 		return "memory://", nil
 	case "", "file":
-		path = filepath.Join(common.CurrentDirectory, path)
+		if !strings.HasPrefix(path, "/") {
+			path = filepath.Join(common.CurrentDirectory, path)
+		}
 	default:
 		return "", fmt.Errorf("unknown storage type")
 	}
@@ -92,7 +94,10 @@ func (l *LevelDBStorage) Validate() error {
 		l.RealPath = ""
 	case "", "file":
 		l.Scheme = "file"
-		l.RealPath = filepath.Join(common.CurrentDirectory, path)
+		l.RealPath = path
+		if !strings.HasPrefix(path, "/") {
+			l.RealPath = filepath.Join(common.CurrentDirectory, path)
+		}
 	default:
 		return fmt.Errorf("unknown storage type")
 	}

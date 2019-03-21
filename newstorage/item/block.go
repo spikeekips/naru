@@ -24,7 +24,7 @@ func (b Block) Save(st storage.Storage) error {
 		return err
 	}
 
-	st.Event("OnSyncSaveBlock "+EventNewBlock, b)
+	st.Event("OnAfterSaveBlock", st, b)
 
 	return nil
 }
