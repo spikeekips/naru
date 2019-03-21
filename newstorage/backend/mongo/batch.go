@@ -2,6 +2,7 @@ package mongostorage
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	logging "github.com/inconshreveable/log15"
@@ -39,7 +40,28 @@ func (b *Batch) Batch() newstorage.BatchStorage {
 	return b
 }
 
+func (b *Batch) allEvents() []common.EventItem {
+	b.RLock()
+	defer b.RUnlock()
+
+	return b.events
+}
+
 func (b *Batch) Write() error {
+	for _, e := range b.allEvents() {
+		var events []string
+		for _, n := range strings.Fields(e.Events) {
+			if !strings.HasPrefix(n, "OnSync") {
+				continue
+			}
+			events = append(events, n)
+		}
+
+		items := []interface{}{b}
+		items = append(items, e.Items...)
+		newstorage.Observer.Trigger(strings.Join(events, " "), items...)
+	}
+
 	b.RLock()
 	result, err := b.s.Collection().BulkWrite(context.Background(), b.ops)
 	if err != nil {
@@ -59,8 +81,19 @@ func (b *Batch) Write() error {
 	)
 
 	b.RLock()
-	for _, e := range b.events {
-		newstorage.Observer.Trigger(e.Events, e.Items...)
+
+	if len(b.events) > 0 {
+		for _, e := range b.events {
+			var events []string
+			for _, n := range strings.Fields(e.Events) {
+				if strings.HasPrefix(n, "OnSync") {
+					continue
+				}
+				events = append(events, n)
+			}
+
+			newstorage.Observer.Trigger(strings.Join(events, " "), e.Items...)
+		}
 	}
 	b.RUnlock()
 

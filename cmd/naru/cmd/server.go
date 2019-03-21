@@ -18,6 +18,7 @@ import (
 	storage "github.com/spikeekips/naru/newstorage"
 	mongostorage "github.com/spikeekips/naru/newstorage/backend/mongo"
 	"github.com/spikeekips/naru/newstorage/item"
+	mongoitem "github.com/spikeekips/naru/newstorage/item/mongo"
 	"github.com/spikeekips/naru/sebak"
 )
 
@@ -112,6 +113,8 @@ func runServer(sc *ServerConfig) error {
 	storage.Observer.On(item.EventUpdateAccount, func(v ...interface{}) {
 		fmt.Println("> account updated", v)
 	})
+
+	mongoitem.EventSync()
 
 	provider := sebak.NewJSONRPCStorageProvider(sc.SEBAK.JSONRpc)
 	sst := sebak.NewStorage(provider)

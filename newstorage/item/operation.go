@@ -89,20 +89,23 @@ func (o Operation) Save(st storage.Storage) error {
 	if err := st.Insert(GetOperationKey(o.Hash), o); err != nil {
 		return err
 	}
-	if err := st.Insert(GetOperationAccountRelatedKey(o.Source, o.Height), o.Hash); err != nil {
-		return err
-	}
 
-	event := GetOperationAccountRelatedEventKey(o.Source)
-	if len(o.Target) > 0 {
-		if err := st.Insert(GetOperationAccountRelatedKey(o.Target, o.Height), o.Hash); err != nil {
+	/*
+		if err := st.Insert(GetOperationAccountRelatedKey(o.Source, o.Height), o.Hash); err != nil {
 			return err
 		}
 
-		event += " " + GetOperationAccountRelatedEventKey(o.Target)
-	}
+		event := GetOperationAccountRelatedEventKey(o.Source)
+		if len(o.Target) > 0 {
+			if err := st.Insert(GetOperationAccountRelatedKey(o.Target, o.Height), o.Hash); err != nil {
+				return err
+			}
 
-	st.Event(event, o)
+			event += " " + GetOperationAccountRelatedEventKey(o.Target)
+		}
+	*/
+
+	st.Event("OnSyncSaveOperation", o)
 
 	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/spikeekips/naru/config"
 	"github.com/spikeekips/naru/digest"
 	mongostorage "github.com/spikeekips/naru/newstorage/backend/mongo"
+	mongoitem "github.com/spikeekips/naru/newstorage/item/mongo"
 	"github.com/spikeekips/naru/sebak"
 )
 
@@ -94,6 +95,8 @@ func runDigest(dc *digestConfig) error {
 		return err
 	}
 	defer st.Close()
+
+	mongoitem.EventSync()
 
 	provider := sebak.NewJSONRPCStorageProvider(dc.SEBAK.JSONRpc)
 	sst := sebak.NewStorage(provider)

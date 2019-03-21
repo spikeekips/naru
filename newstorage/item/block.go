@@ -24,11 +24,7 @@ func (b Block) Save(st storage.Storage) error {
 		return err
 	}
 
-	if err := st.Insert(GetBlockHeightKey(b.Height), b.Hash); err != nil {
-		return err
-	}
-
-	st.Event(EventNewBlock, b)
+	st.Event("OnSyncSaveBlock "+EventNewBlock, b)
 
 	return nil
 }

@@ -30,9 +30,10 @@ func (a Account) Save(st storage.Storage) error {
 	}
 	err := f(GetAccountKey(a.Address), a)
 	if err == nil {
-		st.Event(event, a)
+		st.Event("OnSyncSaveAccount "+event, a)
 		return nil
 	}
+
 	return err
 }
 

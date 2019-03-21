@@ -73,17 +73,35 @@ func (t Transaction) Save(st storage.Storage) error {
 	if err := st.Insert(GetTransactionKey(t.Hash), t); err != nil {
 		return err
 	}
-	if err := st.Insert(GetTransactionBlockKey(t.block.Height), t.Hash); err != nil {
-		return err
-	}
-	if err := st.Insert(GetTransactionSourceKey(t.Source, t.block.Height), t.Hash); err != nil {
-		return err
-	}
-	for _, address := range t.AllAccounts() {
-		if err := st.Insert(GetTransactionAccountsKey(address, t.block.Height), t.Hash); err != nil {
-			return err
+
+	/*
+			if err := st.Insert(GetTransactionBlockKey(t.block.Height), t.Hash); err != nil {
+				return err
+			}
+			if err := st.Insert(GetTransactionSourceKey(t.Source, t.block.Height), t.Hash); err != nil {
+				return err
+			}
+
+		st.Event("OnSyncSaveTransaction", t)
+
+		for _, address := range t.AllAccounts() {
+			if err := st.Insert(GetTransactionAccountsKey(address, t.block.Height), t.Hash); err != nil {
+				return err
+			}
 		}
-	}
+
+		for opIndex, op := range t.tx.B.Operations {
+			o, err := NewOperation(op, t.tx, uint64(opIndex), t.block.Height)
+			if err != nil {
+				return err
+			}
+			if err := o.Save(st); err != nil {
+				return err
+			}
+		}
+	*/
+
+	st.Event("OnSyncSaveTransaction", t, t.tx, t.block)
 
 	for opIndex, op := range t.tx.B.Operations {
 		o, err := NewOperation(op, t.tx, uint64(opIndex), t.block.Height)

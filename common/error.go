@@ -5,10 +5,12 @@ import (
 )
 
 const (
-	HTTPProblemCode = iota + 100
+	CommonErrorCode = iota + 100
+	HTTPProblemCode
 )
 
 var (
+	CommonError = NewError(CommonErrorCode, "")
 	HTTPProblem = NewError(HTTPProblemCode, "http problem")
 )
 
@@ -29,6 +31,12 @@ func (e *Error) Code() uint {
 
 func (e *Error) Message() string {
 	return e.message
+}
+
+func (e *Error) SetMessage(m string) *Error {
+	e.message = m
+
+	return e
 }
 
 func (e *Error) Data() map[string]interface{} {
