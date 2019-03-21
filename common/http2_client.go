@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"golang.org/x/net/http2"
-
-	sebakerrors "boscoin.io/sebak/lib/errors"
 )
 
 type HTTP2Client struct {
@@ -124,7 +122,7 @@ func (cl *HTTP2Client) Get(path string, headers http.Header) (b []byte, err erro
 	}
 
 	if response.StatusCode != http.StatusOK {
-		err = sebakerrors.HTTPProblem.Clone().SetData("status", response.StatusCode).SetData("body", string(b))
+		err = HTTPProblem.New().SetData("status", response.StatusCode).SetData("body", string(b))
 		return
 	}
 
@@ -150,7 +148,7 @@ func (cl *HTTP2Client) Post(path string, body []byte, headers http.Header) (b []
 	}
 
 	if response.StatusCode != http.StatusOK {
-		err = sebakerrors.HTTPProblem.Clone().SetData("status", response.StatusCode).SetData("body", string(b))
+		err = HTTPProblem.New().SetData("status", response.StatusCode).SetData("body", string(b))
 		return
 	}
 

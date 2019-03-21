@@ -9,7 +9,6 @@ import (
 	logging "github.com/inconshreveable/log15"
 	"github.com/spikeekips/naru/cache"
 	"github.com/spikeekips/naru/sebak"
-	"github.com/spikeekips/naru/storage"
 	"golang.org/x/net/http2"
 
 	sebakcommon "boscoin.io/sebak/lib/common"
@@ -18,11 +17,12 @@ import (
 	"github.com/spikeekips/naru/api/rest"
 	cachebackend "github.com/spikeekips/naru/cache/backend"
 	"github.com/spikeekips/naru/config"
+	storage "github.com/spikeekips/naru/newstorage"
 )
 
 type Server struct {
 	bind      *sebakcommon.Endpoint
-	st        *storage.Storage
+	st        storage.Storage
 	sst       *sebak.Storage
 	cch       *cache.Cache
 	sebakInfo sebaknode.NodeInfo
@@ -31,7 +31,7 @@ type Server struct {
 	router    *mux.Router
 }
 
-func NewServer(nc *config.Network, st *storage.Storage, sst *sebak.Storage, cb cachebackend.Backend, sebakInfo sebaknode.NodeInfo) *Server {
+func NewServer(nc *config.Network, st storage.Storage, sst *sebak.Storage, cb cachebackend.Backend, sebakInfo sebaknode.NodeInfo) *Server {
 	httpLog := logging.New("module", "restv1")
 	nc.Log.HTTP.SetLogger(httpLog)
 

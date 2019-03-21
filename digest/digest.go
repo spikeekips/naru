@@ -11,15 +11,15 @@ import (
 	sebakrunner "boscoin.io/sebak/lib/node/runner"
 	sebakstorage "boscoin.io/sebak/lib/storage"
 
+	storage "github.com/spikeekips/naru/newstorage"
+	"github.com/spikeekips/naru/newstorage/item"
 	"github.com/spikeekips/naru/sebak"
-	"github.com/spikeekips/naru/storage"
-	"github.com/spikeekips/naru/storage/item"
 )
 
 var maxNumberOfWorkers int = 100
 
 type Digest struct {
-	st            *storage.Storage
+	st            storage.Storage
 	sst           *sebak.Storage
 	genesisSource string
 	blocksLimit   uint64
@@ -28,7 +28,7 @@ type Digest struct {
 	initialize    bool
 }
 
-func NewDigest(st *storage.Storage, sst *sebak.Storage, genesisSource string, start, end uint64, initialize bool) (*Digest, error) {
+func NewDigest(st storage.Storage, sst *sebak.Storage, genesisSource string, start, end uint64, initialize bool) (*Digest, error) {
 	if start > end {
 		return nil, fmt.Errorf("invalid start and end range: %d - %d", start, end)
 	}
@@ -233,7 +233,7 @@ func (d *Digest) digestBlock(block item.Block) (err error) {
 		return
 	}
 
-	st, err := d.st.OpenBatch()
+	st := d.st.Batch()
 	if err != nil {
 		return err
 	}
@@ -243,14 +243,13 @@ func (d *Digest) digestBlock(block item.Block) (err error) {
 			log.Warn("block already exists", "block", block.Height)
 		} else {
 			log.Error("failed to save block and transactions", "block", block.Height, "error", err)
-			st.Discard()
+			st.Cancel()
 			return
 		}
 	}
 
-	if err = st.Commit(); err == nil {
+	if err = st.Write(); err == nil {
 		log.Debug("block saved", "block", block.Height, "txs", len(txHashes))
-		st.TriggerEvents()
 	}
 
 	return err
@@ -260,9 +259,10 @@ func (d *Digest) logInsertedData() {
 	var blocks, transactions, internals, accounts uint64
 
 	{ // internals
-		iterFunc, closeFunc := d.st.GetIterator(
-			storage.InternalPrefix,
-			sebakstorage.NewDefaultListOptions(false, nil, 0),
+		iterFunc, closeFunc := d.st.Iterator(
+			item.InternalPrefix,
+			"",
+			storage.NewDefaultListOptions(false, nil, 0),
 		)
 		defer closeFunc()
 
@@ -276,9 +276,10 @@ func (d *Digest) logInsertedData() {
 	}
 
 	{ // blocks
-		iterFunc, closeFunc := d.st.GetIterator(
-			storage.BlockPrefix,
-			sebakstorage.NewDefaultListOptions(false, nil, 0),
+		iterFunc, closeFunc := d.st.Iterator(
+			item.BlockPrefix,
+			item.Block{},
+			storage.NewDefaultListOptions(false, nil, 0),
 		)
 		defer closeFunc()
 
@@ -291,9 +292,10 @@ func (d *Digest) logInsertedData() {
 	}
 
 	{ // transactions
-		iterFunc, closeFunc := d.st.GetIterator(
-			storage.TransactionPrefix,
-			sebakstorage.NewDefaultListOptions(false, nil, 0),
+		iterFunc, closeFunc := d.st.Iterator(
+			item.TransactionPrefix,
+			item.Transaction{},
+			storage.NewDefaultListOptions(false, nil, 0),
 		)
 		defer closeFunc()
 
@@ -307,9 +309,10 @@ func (d *Digest) logInsertedData() {
 	}
 
 	{ // accounts
-		iterFunc, closeFunc := d.st.GetIterator(
-			storage.AccountPrefix,
-			sebakstorage.NewDefaultListOptions(false, nil, 0),
+		iterFunc, closeFunc := d.st.Iterator(
+			item.AccountPrefix,
+			item.Account{},
+			storage.NewDefaultListOptions(false, nil, 0),
 		)
 		defer closeFunc()
 
@@ -331,7 +334,7 @@ func (d *Digest) logInsertedData() {
 	)
 }
 
-func (d *Digest) saveAccounts(st *storage.Storage, addresses ...string) error {
+func (d *Digest) saveAccounts(st storage.Storage, addresses ...string) error {
 	var count int
 	if len(addresses) < 1 {
 		options := sebakstorage.NewDefaultListOptions(false, nil, 0)
@@ -372,12 +375,12 @@ func (d *Digest) saveAccounts(st *storage.Storage, addresses ...string) error {
 	return nil
 }
 
-func (d *Digest) saveBlock(st *storage.Storage, block item.Block, txs []item.TransactionMessage) error {
+func (d *Digest) saveBlock(st storage.Storage, block item.Block, txs []item.TransactionMessage) error {
 	var addresses []string
 	for _, txm := range txs {
 		tx := item.NewTransaction(txm.Transaction, block, txm.Raw)
 		if err := tx.Save(st); err != nil {
-			log.Error("failed to save transaction", "tx", tx.Hash)
+			log.Error("failed to save transaction", "tx", tx.Hash, "error", err)
 			return err
 		}
 		log.Debug("save transaction", "tx", txm)

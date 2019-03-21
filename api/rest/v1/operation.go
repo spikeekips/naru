@@ -5,8 +5,8 @@ import (
 
 	sebakapi "boscoin.io/sebak/lib/node/runner/api"
 
-	"github.com/spikeekips/naru/storage"
-	"github.com/spikeekips/naru/storage/item"
+	storage "github.com/spikeekips/naru/newstorage"
+	"github.com/spikeekips/naru/newstorage/item"
 )
 
 type OperationsByAccountStreamHandler struct {
@@ -33,10 +33,12 @@ func (g OperationsByAccountStreamHandler) NewRequest(base BaseStreamHandler) (St
 }
 
 func (g *OperationsByAccountStreamHandler) Init() <-chan interface{} {
+	// TODO
+	lo := g.query.ListOptions()
 	iterFunc, closeFunc := item.GetOperationsByAccount(
 		g.H.st,
 		g.address,
-		g.query.ListOptions(),
+		storage.NewDefaultListOptions(lo.Reverse(), lo.Cursor(), lo.Limit()),
 	)
 
 	ch := make(chan interface{})

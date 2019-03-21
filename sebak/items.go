@@ -5,12 +5,11 @@ import (
 
 	sebakblock "boscoin.io/sebak/lib/block"
 	sebakcommon "boscoin.io/sebak/lib/common"
-	sebakerrors "boscoin.io/sebak/lib/errors"
 	sebakstorage "boscoin.io/sebak/lib/storage"
 	sebaktransaction "boscoin.io/sebak/lib/transaction"
 
-	"github.com/spikeekips/naru/storage"
-	"github.com/spikeekips/naru/storage/item"
+	storage "github.com/spikeekips/naru/newstorage"
+	"github.com/spikeekips/naru/newstorage/item"
 )
 
 func GetBlockByHeight(s *Storage, height uint64) (block sebakblock.Block, err error) {
@@ -22,7 +21,7 @@ func GetBlockByHeight(s *Storage, height uint64) (block sebakblock.Block, err er
 	it, _ := iterFunc()
 	closeFunc()
 	if len(it.Key) < 1 {
-		err = sebakerrors.BlockNotFound
+		err = BlockNotFound.New()
 		return
 	}
 
@@ -48,7 +47,7 @@ func GetLastBlock(s *Storage) (block sebakblock.Block, err error) {
 	it, _ := iterFunc()
 	closeFunc()
 	if len(it.Key) < 1 {
-		err = sebakerrors.BlockNotFound
+		err = BlockNotFound.New()
 		return
 	}
 

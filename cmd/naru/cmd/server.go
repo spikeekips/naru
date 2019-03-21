@@ -9,15 +9,16 @@ import (
 	"github.com/spf13/viper"
 
 	cmdcommon "boscoin.io/sebak/cmd/sebak/common"
-	sebakstorage "boscoin.io/sebak/lib/storage"
 	"github.com/spikeekips/cvc"
 
 	restv1 "github.com/spikeekips/naru/api/rest/v1"
 	cachebackend "github.com/spikeekips/naru/cache/backend"
 	"github.com/spikeekips/naru/config"
 	"github.com/spikeekips/naru/digest"
+	storage "github.com/spikeekips/naru/newstorage"
+	mongostorage "github.com/spikeekips/naru/newstorage/backend/mongo"
+	"github.com/spikeekips/naru/newstorage/item"
 	"github.com/spikeekips/naru/sebak"
-	"github.com/spikeekips/naru/storage"
 )
 
 var (
@@ -26,12 +27,13 @@ var (
 
 type ServerConfig struct {
 	cvc.BaseGroup
-	SEBAK   *config.SEBAK
-	Digest  *config.Digest
-	System  *config.System
-	Network *config.Network
-	Storage *config.Storage
-	Log     *config.Logs
+	SEBAK      *config.SEBAK
+	Digest     *config.Digest
+	System     *config.System
+	Network    *config.Network
+	Storage    *config.Storage
+	NewStorage *config.NewStorage
+	Log        *config.Logs
 
 	Verbose bool `flag-help:"verbose"`
 }
@@ -51,7 +53,6 @@ func init() {
 			}
 
 			log.Debug("config merged", serverConfigManager.ConfigPprint()...)
-			log.Info("config merged")
 
 			SetAllLogging(sc.Log)
 
@@ -65,12 +66,13 @@ func init() {
 	rootCmd.AddCommand(serverCmd)
 
 	sc = &ServerConfig{
-		SEBAK:   config.NewSEBAK(),
-		Digest:  config.NewDigest(),
-		System:  config.NewSystem(),
-		Network: config.NewNetwork(),
-		Storage: config.NewStorage(),
-		Log:     config.NewLogs(),
+		SEBAK:      config.NewSEBAK(),
+		Digest:     config.NewDigest(),
+		System:     config.NewSystem(),
+		Network:    config.NewNetwork(),
+		Storage:    config.NewStorage0(),
+		NewStorage: config.NewNewStorage(),
+		Log:        config.NewLogs(),
 	}
 	serverConfigManager = cvc.NewManager("naru", sc, serverCmd, viper.New())
 }
@@ -86,30 +88,28 @@ func runServer(sc *ServerConfig) error {
 	log.Debug("sebak nodeinfo", "nodeinfo", nodeInfo)
 
 	if sc.Digest.Init {
-		if err = os.RemoveAll(sc.Storage.Path); err != nil {
-			log.Crit("failed to remove storage", "directory", sc.Storage.Path, "error", err)
+		if err = os.RemoveAll(sc.Storage.LevelDB.Path); err != nil {
+			log.Crit("failed to remove storage", "directory", sc.Storage.LevelDB.Path, "error", err)
 			return err
 		}
 	}
 
-	// run digest first
-	var nst *sebakstorage.LevelDBBackend
-	if nst, err = sebakstorage.NewStorage(sc.Storage.StorageConfig()); err != nil {
-		log.Crit("failed to load leveldb storage", "directory", sc.Storage.Path, "error", err)
+	//st, err := leveldbstorage.NewStorage(sc.NewStorage.LevelDB)
+	st, err := mongostorage.NewStorage(sc.NewStorage.Mongo)
+	if err != nil {
+		log.Crit("failed to load storage", "config", sc.NewStorage, "error", err)
 		return err
 	}
 
-	st := storage.NewStorage(nst)
-
-	storage.Observer.On(storage.EventNewBlock, func(v ...interface{}) {
+	storage.Observer.On(item.EventNewBlock, func(v ...interface{}) {
 		fmt.Println("> new block triggered", v)
 	})
 
-	storage.Observer.On(storage.EventNewAccount, func(v ...interface{}) {
+	storage.Observer.On(item.EventNewAccount, func(v ...interface{}) {
 		fmt.Println("> new account triggered", v)
 	})
 
-	storage.Observer.On(storage.EventUpdateAccount, func(v ...interface{}) {
+	storage.Observer.On(item.EventUpdateAccount, func(v ...interface{}) {
 		fmt.Println("> account updated", v)
 	})
 
@@ -125,11 +125,12 @@ func runServer(sc *ServerConfig) error {
 	}
 
 	watchRunner := digest.NewWatchDigestRunner(st, sst, nodeInfo, runner.StoredRemoteBlock().Height+1)
-	go func() {
-		if err := watchRunner.Run(false); err != nil {
-			log.Crit("failed watchRunner", "error", err)
-		}
-	}()
+	//go func() {
+	if err := watchRunner.Run(false); err != nil {
+		log.Crit("failed watchRunner", "error", err)
+		return err
+	}
+	//}()
 
 	// start network layers
 	cb := cachebackend.NewGoCache()

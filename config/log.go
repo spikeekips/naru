@@ -151,7 +151,7 @@ func (l *LogConfig) SetLogger(logger logging.Logger) {
 	logger.SetHandler(logging.LvlFilterHandler(l.Level(), l.Handler()))
 }
 
-func (l *LogConfig) Merge(c *LogConfig) {
+func (l *LogConfig) Combine(c *LogConfig) {
 	if l == nil {
 		l = &LogConfig{}
 	}
@@ -185,6 +185,7 @@ type PackageLog struct {
 	Restv1  *LogConfig
 	Storage *LogConfig
 	SEBAK   *LogConfig
+	Query   *LogConfig
 }
 
 func NewLogs() *Logs {
@@ -194,17 +195,18 @@ func NewLogs() *Logs {
 	}
 }
 
-func (l *Logs) Validate() error {
+func (l *Logs) Merge() error {
 	if l.Global == nil {
 		l.Global = NewLog()
 	}
 
-	l.Package.Config.Merge(l.Global)
-	l.Package.Common.Merge(l.Global)
-	l.Package.Digest.Merge(l.Global)
-	l.Package.Restv1.Merge(l.Global)
-	l.Package.Storage.Merge(l.Global)
-	l.Package.SEBAK.Merge(l.Global)
+	l.Package.Config.Combine(l.Global)
+	l.Package.Common.Combine(l.Global)
+	l.Package.Digest.Combine(l.Global)
+	l.Package.Restv1.Combine(l.Global)
+	l.Package.Storage.Combine(l.Global)
+	l.Package.SEBAK.Combine(l.Global)
+	l.Package.Query.Combine(l.Global)
 
 	return nil
 }

@@ -7,13 +7,12 @@ import (
 	"github.com/spf13/viper"
 
 	cmdcommon "boscoin.io/sebak/cmd/sebak/common"
-	sebakstorage "boscoin.io/sebak/lib/storage"
 
 	"github.com/spikeekips/cvc"
 	"github.com/spikeekips/naru/config"
 	"github.com/spikeekips/naru/digest"
+	mongostorage "github.com/spikeekips/naru/newstorage/backend/mongo"
 	"github.com/spikeekips/naru/sebak"
-	"github.com/spikeekips/naru/storage"
 )
 
 var (
@@ -22,12 +21,13 @@ var (
 
 type digestConfig struct {
 	cvc.BaseGroup
-	SEBAK   *config.SEBAK
-	Digest  *config.Digest
-	System  *config.System
-	Network *config.Network
-	Storage *config.Storage
-	Log     *config.Logs
+	SEBAK      *config.SEBAK
+	Digest     *config.Digest
+	System     *config.System
+	Network    *config.Network
+	Storage    *config.Storage
+	NewStorage *config.NewStorage
+	Log        *config.Logs
 
 	Verbose bool `flag-help:"verbose"`
 }
@@ -47,7 +47,6 @@ func init() {
 			}
 
 			log.Debug("config merged", digestConfigManager.ConfigPprint()...)
-			log.Info("config merged")
 
 			SetAllLogging(dc.Log)
 
@@ -63,15 +62,15 @@ func init() {
 	rootCmd.AddCommand(digestCmd)
 
 	dc = &digestConfig{
-		SEBAK:   config.NewSEBAK(),
-		Digest:  config.NewDigest(),
-		System:  config.NewSystem(),
-		Network: config.NewNetwork(),
-		Storage: config.NewStorage(),
-		Log:     config.NewLogs(),
+		SEBAK:      config.NewSEBAK(),
+		Digest:     config.NewDigest(),
+		System:     config.NewSystem(),
+		Network:    config.NewNetwork(),
+		Storage:    config.NewStorage0(),
+		NewStorage: config.NewNewStorage(),
+		Log:        config.NewLogs(),
 	}
 	digestConfigManager = cvc.NewManager("naru", dc, digestCmd, viper.New())
-
 }
 
 func runDigest(dc *digestConfig) error {
@@ -82,19 +81,20 @@ func runDigest(dc *digestConfig) error {
 	log.Debug("sebak nodeinfo", "nodeinfo", nodeInfo)
 
 	if dc.Digest.Init {
-		if err = os.RemoveAll(dc.Storage.Path); err != nil {
-			log.Crit("failed to remove storage", "directory", dc.Storage.Path, "error", err)
+		if err = os.RemoveAll(dc.Storage.LevelDB.Path); err != nil {
+			log.Crit("failed to remove storage", "directory", dc.Storage.LevelDB.Path, "error", err)
 			return err
 		}
 	}
 
-	var nst *sebakstorage.LevelDBBackend
-	if nst, err = sebakstorage.NewStorage(dc.Storage.StorageConfig()); err != nil {
-		log.Crit("failed to load leveldb storage", "directory", dc.Storage.Path, "error", err)
+	//st, err := leveldbstorage.NewStorage(dc.NewStorage.LevelDB)
+	st, err := mongostorage.NewStorage(dc.NewStorage.Mongo)
+	if err != nil {
+		log.Crit("failed to load storage", "config", dc.NewStorage, "error", err)
 		return err
 	}
+	defer st.Close()
 
-	st := storage.NewStorage(nst)
 	provider := sebak.NewJSONRPCStorageProvider(dc.SEBAK.JSONRpc)
 	sst := sebak.NewStorage(provider)
 

@@ -11,16 +11,16 @@ import (
 	sebaknode "boscoin.io/sebak/lib/node"
 
 	"github.com/spikeekips/naru/common"
+	storage "github.com/spikeekips/naru/newstorage"
+	"github.com/spikeekips/naru/newstorage/item"
 	"github.com/spikeekips/naru/sebak"
-	"github.com/spikeekips/naru/storage"
-	"github.com/spikeekips/naru/storage/item"
 )
 
 var farBlockHeight uint64 = 1000
 
 type BaseDigestRunner struct {
 	sync.RWMutex
-	st                  *storage.Storage
+	st                  storage.Storage
 	sst                 *sebak.Storage
 	sebakInfo           sebaknode.NodeInfo
 	storedRemoteBlock   sebakblock.Block
@@ -66,7 +66,7 @@ type InitializeDigestRunner struct {
 	initialize bool
 }
 
-func NewInitializeDigestRunner(st *storage.Storage, sst *sebak.Storage, sebakInfo sebaknode.NodeInfo) *InitializeDigestRunner {
+func NewInitializeDigestRunner(st storage.Storage, sst *sebak.Storage, sebakInfo sebaknode.NodeInfo) *InitializeDigestRunner {
 	return &InitializeDigestRunner{
 		BaseDigestRunner: &BaseDigestRunner{
 			st:        st,
@@ -171,7 +171,7 @@ type WatchDigestRunner struct {
 	interval time.Duration
 }
 
-func NewWatchDigestRunner(st *storage.Storage, sst *sebak.Storage, sebakInfo sebaknode.NodeInfo, start uint64) *WatchDigestRunner {
+func NewWatchDigestRunner(st storage.Storage, sst *sebak.Storage, sebakInfo sebaknode.NodeInfo, start uint64) *WatchDigestRunner {
 	return &WatchDigestRunner{
 		BaseDigestRunner: &BaseDigestRunner{
 			st:        st,
@@ -208,6 +208,7 @@ func (w *WatchDigestRunner) Run(force bool) error {
 		lastRemoteBlock, err = sebak.GetLastBlock(sst)
 		if err != nil {
 			sst.Provider().Close()
+			log.Error("failed to get remote block", "error", err)
 			return err
 		}
 	}
@@ -220,6 +221,7 @@ func (w *WatchDigestRunner) Run(force bool) error {
 			if e, ok := err.(*sebakerrors.Error); ok {
 				if e.Code != sebakerrors.StorageRecordDoesNotExist.Code {
 					sst.Provider().Close()
+					log.Error("failed to get block by height", "error", err)
 					return err
 				}
 			}
@@ -231,6 +233,7 @@ func (w *WatchDigestRunner) Run(force bool) error {
 	{ // get last local block
 		block, err := item.GetLastBlock(w.st)
 		if err != nil {
+			log.Error("failed to get last local block", "error", err)
 			return err
 		}
 		w.setLastLocalBlock(block)

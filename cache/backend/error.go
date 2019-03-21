@@ -1,7 +1,7 @@
 package cachebackend
 
 import (
-	sebakerrors "boscoin.io/sebak/lib/errors"
+	"github.com/spikeekips/naru/common"
 )
 
 const (
@@ -9,5 +9,5 @@ const (
 )
 
 var (
-	CacheItemNotFound = sebakerrors.NewError(CacheItemNotFoundCode, "item not found in cache")
+	CacheItemNotFound = common.NewError(CacheItemNotFoundCode, "item not found in cache")
 )

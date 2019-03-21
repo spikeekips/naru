@@ -11,14 +11,13 @@ import (
 
 	sebakblock "boscoin.io/sebak/lib/block"
 	sebakcommon "boscoin.io/sebak/lib/common"
-	sebakerrors "boscoin.io/sebak/lib/errors"
 	sebakresource "boscoin.io/sebak/lib/node/runner/api/resource"
 	sebaktransaction "boscoin.io/sebak/lib/transaction"
 
 	"github.com/spikeekips/naru/api/rest"
 	resourcev1 "github.com/spikeekips/naru/api/rest/v1/resource"
 	"github.com/spikeekips/naru/common"
-	"github.com/spikeekips/naru/storage/item"
+	"github.com/spikeekips/naru/newstorage/item"
 )
 
 func (h *Handler) PostTransaction(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +33,7 @@ func (h *Handler) PostTransaction(w http.ResponseWriter, r *http.Request) {
 
 	var tx sebaktransaction.Transaction
 	if err := json.Unmarshal(body, &tx); err != nil {
-		err = sebakerrors.InvalidMessage.Clone().SetData(
+		err = InvalidMessage.New().SetData(
 			"status", http.StatusBadRequest,
 		)
 		jw.WriteObject(err)
@@ -64,9 +63,10 @@ func (h *Handler) PostTransaction(w http.ResponseWriter, r *http.Request) {
 
 	var b []byte
 	if b, err = client.Post("/api/v1/transactions", body, nil); err != nil {
-		if se, ok := err.(*sebakerrors.Error); ok {
-			w.WriteHeader(se.GetData("status").(int))
-			w.Write([]byte(se.GetData("body").(string)))
+		if se, ok := err.(*common.Error); ok {
+			// TODO create new error type for http error
+			w.WriteHeader(se.Data()["status"].(int))
+			w.Write([]byte(se.Data()["body"].(string)))
 			return
 		}
 
@@ -112,7 +112,7 @@ func (h *Handler) GetTransactionStatus(w http.ResponseWriter, r *http.Request) {
 
 	if status == "notfound" {
 		jw.WriteHeader(http.StatusNotFound)
-		jw.WriteObject(sebakerrors.TransactionNotFound)
+		jw.WriteObject(TransactionNotFound)
 		return
 	}
 

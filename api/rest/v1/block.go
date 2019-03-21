@@ -9,11 +9,10 @@ import (
 	"github.com/nvellon/hal"
 
 	sebakcommon "boscoin.io/sebak/lib/common"
-	sebakerrors "boscoin.io/sebak/lib/errors"
 	sebakresource "boscoin.io/sebak/lib/node/runner/api/resource"
 
 	"github.com/spikeekips/naru/api/rest"
-	"github.com/spikeekips/naru/storage/item"
+	"github.com/spikeekips/naru/newstorage/item"
 )
 
 func (h *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +21,7 @@ func (h *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	hash := vars["hashOrHeight"]
 	if hash == "" {
-		jw.WriteObject(sebakerrors.BadRequestParameter)
+		jw.WriteObject(BadRequestParameter)
 		return
 	}
 

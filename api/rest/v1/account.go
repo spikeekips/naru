@@ -7,11 +7,10 @@ import (
 
 	"github.com/gorilla/mux"
 
-	sebakerrors "boscoin.io/sebak/lib/errors"
 	sebakresource "boscoin.io/sebak/lib/node/runner/api/resource"
 
 	"github.com/spikeekips/naru/api/rest"
-	"github.com/spikeekips/naru/storage/item"
+	"github.com/spikeekips/naru/newstorage/item"
 )
 
 var (
@@ -46,14 +45,14 @@ func (h *Handler) GetAccounts(w http.ResponseWriter, r *http.Request) {
 
 	var addresses []string
 	if err := json.Unmarshal(body, &addresses); err != nil {
-		jw.WriteObject(sebakerrors.BadRequestParameter.Clone().SetData("error", err.Error()))
+		jw.WriteObject(BadRequestParameter.New().SetData("error", err.Error()))
 		return
 	}
 	if len(addresses) > GetAccountsDefaultLimit {
-		jw.WriteObject(sebakerrors.PageQueryLimitMaxExceed)
+		jw.WriteObject(PageQueryLimitMaxExceed)
 		return
 	} else if len(addresses) < 1 {
-		jw.WriteObject(sebakerrors.BadRequestParameter)
+		jw.WriteObject(BadRequestParameter)
 		return
 	}
 

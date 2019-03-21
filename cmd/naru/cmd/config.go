@@ -9,7 +9,7 @@ import (
 	"github.com/spikeekips/cvc"
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/digest"
-	"github.com/spikeekips/naru/storage"
+	storage "github.com/spikeekips/naru/newstorage"
 
 	cmdcommon "boscoin.io/sebak/cmd/sebak/common"
 	"github.com/spikeekips/naru/config"
@@ -58,9 +58,12 @@ func init() {
 					log.Error("failed to merge config", "error", err)
 					cmdcommon.PrintError(c, err)
 				}
-				printCheck(c, configCheckManager, configFileManager.Config().(*configFileConfig).Format)
-				printCheck(c, configFileManager, configFileManager.Config().(*configFileConfig).Format)
-				printCheck(c, serverConfigManager, configFileManager.Config().(*configFileConfig).Format)
+
+				format := configFileManager.Config().(*configFileConfig).Format
+				printCheck(c, configCheckManager, format)
+				printCheck(c, configFileManager, format)
+				printCheck(c, digestConfigManager, format)
+				printCheck(c, serverConfigManager, format)
 			},
 		}
 		configCmd.AddCommand(configFileCmd)

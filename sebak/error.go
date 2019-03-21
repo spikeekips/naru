@@ -1,15 +1,17 @@
 package sebak
 
 import (
-	sebakerrors "boscoin.io/sebak/lib/errors"
+	"github.com/spikeekips/naru/common"
 )
 
 const (
 	ProviderNotOpenedErrorCode = iota + 100
 	ProviderNotClosedErrorCode
+	BlockNotFoundCode
 )
 
 var (
-	ProviderNotOpenedError = sebakerrors.NewError(ProviderNotOpenedErrorCode, "SEBAKStorageProvider is not opened")
-	ProviderNotClosedError = sebakerrors.NewError(ProviderNotClosedErrorCode, "SEBAKStorageProvider is not closed")
+	ProviderNotOpenedError = common.NewError(ProviderNotOpenedErrorCode, "SEBAKStorageProvider is not opened")
+	ProviderNotClosedError = common.NewError(ProviderNotClosedErrorCode, "SEBAKStorageProvider is not closed")
+	BlockNotFound          = common.NewError(BlockNotFoundCode, "block not found")
 )

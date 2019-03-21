@@ -12,8 +12,8 @@ import (
 	restv1 "github.com/spikeekips/naru/api/rest/v1"
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/digest"
+	storage "github.com/spikeekips/naru/newstorage"
 	"github.com/spikeekips/naru/sebak"
-	"github.com/spikeekips/naru/storage"
 )
 
 var (
