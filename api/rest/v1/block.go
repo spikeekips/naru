@@ -16,7 +16,7 @@ import (
 )
 
 func (h *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
-	jw := rest.NewJSONWriter(w)
+	jw := rest.NewJSONWriter(w, r)
 
 	vars := mux.Vars(r)
 	hash := vars["hashOrHeight"]

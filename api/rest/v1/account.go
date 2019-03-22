@@ -21,7 +21,7 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	address := vars["id"]
 
-	jw := rest.NewJSONWriter(w)
+	jw := rest.NewJSONWriter(w, r)
 
 	ac, err := item.GetAccount(h.st, address)
 	if err != nil {
@@ -35,7 +35,7 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetAccounts(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	jw := rest.NewJSONWriter(w)
+	jw := rest.NewJSONWriter(w, r)
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {

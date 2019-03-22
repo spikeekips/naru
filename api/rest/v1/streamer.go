@@ -47,7 +47,7 @@ func (s Streamer) Handler(w http.ResponseWriter, r *http.Request) {
 		connCloseNotify = cw.CloseNotify()
 	}
 
-	jw := rest.NewJSONWriter(w)
+	jw := rest.NewJSONWriter(w, r)
 	jw.Header().Set("X-SEBAK-TIMEOUT", s.timeout.String())
 
 	streamer, err := s.newHandler.NewRequest(

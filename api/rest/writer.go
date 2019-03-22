@@ -73,10 +73,23 @@ func FlushWriterMiddleware() mux.MiddlewareFunc {
 
 type JSONWriter struct {
 	http.ResponseWriter
+	pretty bool
 }
 
-func NewJSONWriter(w http.ResponseWriter) *JSONWriter {
-	return &JSONWriter{ResponseWriter: w}
+func NewJSONWriter(w http.ResponseWriter, r *http.Request) *JSONWriter {
+	return &JSONWriter{
+		ResponseWriter: w,
+		pretty:         r.URL.Query().Get("pretty") == "1",
+	}
+}
+
+func (j *JSONWriter) Write(b []byte) (int, error) {
+	e := json.NewEncoder(j.ResponseWriter)
+	e.SetEscapeHTML(false)
+	if j.pretty {
+		e.SetIndent("", "  ")
+	}
+	return 0, e.Encode(json.RawMessage(b))
 }
 
 func (j *JSONWriter) writeObject(v interface{}) (int, error) {

@@ -23,7 +23,7 @@ import (
 func (h *Handler) PostTransaction(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	jw := rest.NewJSONWriter(w)
+	jw := rest.NewJSONWriter(w, r)
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -81,7 +81,7 @@ func (h *Handler) GetTransactionByHash(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	hash := vars["id"]
 
-	jw := rest.NewJSONWriter(w)
+	jw := rest.NewJSONWriter(w, r)
 
 	tx, err := item.GetTransaction(h.st, hash)
 	if err != nil {
@@ -96,7 +96,7 @@ func (h *Handler) GetTransactionStatus(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	hash := vars["id"]
 
-	jw := rest.NewJSONWriter(w)
+	jw := rest.NewJSONWriter(w, r)
 
 	status := "notfound"
 	if found, err := item.ExistsTransaction(h.st, hash); err != nil {

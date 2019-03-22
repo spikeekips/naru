@@ -53,18 +53,7 @@ type CacheItem struct {
 	status int
 	header http.Header
 	body   []byte
-}
-
-func (c CacheItem) Write(w http.ResponseWriter) {
-	for k, v := range c.header {
-		for _, i := range v {
-			w.Header().Add(k, i)
-		}
-	}
-	w.Header().Set("X-SEBAK-CACHE", "1")
-
-	w.WriteHeader(c.status)
-	w.Write(c.body)
+	expire time.Duration
 }
 
 type CacheHandler struct {
@@ -108,24 +97,30 @@ func (c *CacheHandler) Handler() func(http.ResponseWriter, *http.Request) {
 			return
 		}
 
+		jw := rest.NewJSONWriter(w, r)
 		if raw, err := c.cch.Get(cacheKey); err != nil {
 			if err != cachebackend.CacheItemNotFound {
-				jw := rest.NewJSONWriter(w)
 				jw.WriteObject(err)
 				return
 			}
 		} else if item, ok := raw.(CacheItem); !ok {
-			jw := rest.NewJSONWriter(w)
 			jw.WriteObject(fmt.Errorf("something wrong in cache"))
 			return
 		} else {
-			item.Write(w)
+			for k, v := range item.header {
+				for _, i := range v {
+					jw.Header().Add(k, i)
+				}
+			}
+
+			jw.Header().Set("X-SEBAK-CACHE", item.expire.String())
+			jw.WriteHeader(item.status)
+			jw.Write(item.body)
+
 			return
 		}
 
 		cw := NewCacheWriter(w)
-
-		c.handler(cw, r)
 
 		var expire time.Duration = c.expire
 		var matched bool
@@ -134,6 +129,9 @@ func (c *CacheHandler) Handler() func(http.ResponseWriter, *http.Request) {
 				break
 			}
 		}
+
+		cw.Header().Set("X-SEBAK-CACHE", expire.String())
+		c.handler(cw, r)
 
 		if !matched {
 			return
@@ -147,6 +145,7 @@ func (c *CacheHandler) Handler() func(http.ResponseWriter, *http.Request) {
 			status: cw.Status(),
 			header: cw.Header(),
 			body:   cw.Buffer(),
+			expire: expire,
 		}
 
 		c.cch.Set(cacheKey, item, expire)
