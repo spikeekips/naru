@@ -2,58 +2,141 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
-	sebakstorage "boscoin.io/sebak/lib/storage"
 	"github.com/spikeekips/cvc"
+	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/spikeekips/naru/common"
 )
 
 type Storage struct {
 	cvc.BaseGroup
-	LevelDB *LevelDB `flag:"leveldb"`
+	LevelDB *LevelDBStorage `flag:"leveldb"`
+	Mongo   *MongoStorage
 }
 
-func NewStorage0() *Storage {
+func NewStorage() *Storage {
 	return &Storage{
-		LevelDB: NewLevelDB(),
+		LevelDB: NewLevelDBStorage(),
+		Mongo:   NewMongoStorage(),
 	}
 }
 
-type LevelDB struct {
+type LevelDBStorage struct {
 	cvc.BaseGroup
-	Path string `flag-help:"storage path"`
+	Path     string `flag-help:"storage path"`
+	Scheme   string `flag:"-"`
+	RealPath string `flag:"-"`
 }
 
-func NewLevelDB() *LevelDB {
-	return &LevelDB{
-		Path: filepath.Join(common.CurrentDirectory, common.DefaultStoragePath),
+func NewLevelDBStorage() *LevelDBStorage {
+	p := filepath.Join(common.CurrentDirectory, common.DefaultStoragePath)
+	return &LevelDBStorage{
+		Path:     "file://" + p,
+		Scheme:   "file",
+		RealPath: p,
 	}
 }
 
-func (s LevelDB) ParsePath(i string) (string, error) {
-	path := filepath.Join(common.CurrentDirectory, i)
+func (l LevelDBStorage) Type() string {
+	return "leveldb"
+}
+
+func (l LevelDBStorage) ParsePath(s string) (string, error) {
+	var scheme, path string
+	{
+		u, err := url.Parse(s)
+		if err != nil {
+			return "", err
+		}
+		scheme = u.Scheme
+		path = u.Path
+	}
+
+	switch strings.ToLower(scheme) {
+	case "memory":
+		return "memory://", nil
+	case "", "file":
+		if !strings.HasPrefix(path, "/") {
+			path = filepath.Join(common.CurrentDirectory, path)
+		}
+	default:
+		return "", fmt.Errorf("unknown storage type")
+	}
+
 	if fi, err := os.Stat(path); err == nil {
 		if !fi.IsDir() {
 			return "", fmt.Errorf("storage path is not directory")
 		}
 	}
 
-	return path, nil
+	return s, nil
 }
 
-func (s *LevelDB) StorageConfig() *sebakstorage.Config {
-	c, _ := sebakstorage.NewConfigFromString("file://" + s.Path)
-
-	return c
-}
-
-func (s *LevelDB) FlagValuePath() string {
-	n, err := filepath.Rel(common.CurrentDirectory, s.Path)
-	if err != nil {
-		return s.Path
+func (l *LevelDBStorage) Validate() error {
+	var scheme, path string
+	{
+		u, err := url.Parse(l.Path)
+		if err != nil {
+			return err
+		}
+		scheme = u.Scheme
+		path = u.Path
 	}
-	return n
+
+	switch strings.ToLower(scheme) {
+	case "memory":
+		l.Scheme = "memory"
+		l.RealPath = ""
+	case "", "file":
+		l.Scheme = "file"
+		l.RealPath = path
+		if !strings.HasPrefix(path, "/") {
+			l.RealPath = filepath.Join(common.CurrentDirectory, path)
+		}
+	default:
+		return fmt.Errorf("unknown storage type")
+	}
+
+	return nil
+}
+
+// MongoStorage is based on 'Connection String Options' of mongodb. See
+// https://docs.mongodb.com/manual/reference/connection-string/#connections-connection-options
+type MongoStorage struct {
+	cvc.BaseGroup
+	URI *mongooptions.ClientOptions
+	DB  string
+}
+
+func NewMongoStorage() *MongoStorage {
+	return &MongoStorage{
+		URI: mongooptions.Client().ApplyURI("mongodb://localhost:27017"),
+		DB:  "naru",
+	}
+}
+
+func (m MongoStorage) Type() string {
+	return "mongo"
+}
+
+func (m MongoStorage) FlagValueURI() string {
+	return ""
+}
+
+func (m MongoStorage) ParseURI(s string) (*mongooptions.ClientOptions, error) {
+	if _, err := url.Parse(s); err != nil {
+		return nil, err
+	}
+
+	options := mongooptions.Client().ApplyURI(s)
+	if err := options.Validate(); err != nil {
+		return nil, err
+	}
+
+	return options, nil
 }

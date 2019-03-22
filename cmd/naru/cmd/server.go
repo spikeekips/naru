@@ -28,13 +28,12 @@ var (
 
 type ServerConfig struct {
 	cvc.BaseGroup
-	SEBAK      *config.SEBAK
-	Digest     *config.Digest
-	System     *config.System
-	Network    *config.Network
-	Storage    *config.Storage
-	NewStorage *config.NewStorage
-	Log        *config.Logs
+	SEBAK   *config.SEBAK
+	Digest  *config.Digest
+	System  *config.System
+	Network *config.Network
+	Storage *config.Storage
+	Log     *config.Logs
 
 	Verbose bool `flag-help:"verbose"`
 }
@@ -67,13 +66,12 @@ func init() {
 	rootCmd.AddCommand(serverCmd)
 
 	sc = &ServerConfig{
-		SEBAK:      config.NewSEBAK(),
-		Digest:     config.NewDigest(),
-		System:     config.NewSystem(),
-		Network:    config.NewNetwork(),
-		Storage:    config.NewStorage0(),
-		NewStorage: config.NewNewStorage(),
-		Log:        config.NewLogs(),
+		SEBAK:   config.NewSEBAK(),
+		Digest:  config.NewDigest(),
+		System:  config.NewSystem(),
+		Network: config.NewNetwork(),
+		Storage: config.NewStorage(),
+		Log:     config.NewLogs(),
 	}
 	serverConfigManager = cvc.NewManager("naru", sc, serverCmd, viper.New())
 }
@@ -95,18 +93,18 @@ func runServer(sc *ServerConfig) error {
 		}
 	}
 
-	st, err := leveldbstorage.NewStorage(sc.NewStorage.LevelDB)
+	st, err := leveldbstorage.NewStorage(sc.Storage.LevelDB)
 	if err != nil {
-		log.Crit("failed to load storage", "config", sc.NewStorage, "error", err)
+		log.Crit("failed to load storage", "config", sc.Storage, "error", err)
 		return err
 	}
 	defer st.Close()
 	leveldbitem.EventSync()
 
 	/*
-		st, err := mongostorage.NewStorage(sc.NewStorage.Mongo)
+		st, err := mongostorage.NewStorage(sc.Storage.Mongo)
 		if err != nil {
-			log.Crit("failed to load storage", "config", sc.NewStorage, "error", err)
+			log.Crit("failed to load storage", "config", sc.Storage, "error", err)
 			return err
 		}
 		defer st.Close()

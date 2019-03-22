@@ -22,13 +22,12 @@ var (
 
 type digestConfig struct {
 	cvc.BaseGroup
-	SEBAK      *config.SEBAK
-	Digest     *config.Digest
-	System     *config.System
-	Network    *config.Network
-	Storage    *config.Storage
-	NewStorage *config.NewStorage
-	Log        *config.Logs
+	SEBAK   *config.SEBAK
+	Digest  *config.Digest
+	System  *config.System
+	Network *config.Network
+	Storage *config.Storage
+	Log     *config.Logs
 
 	Verbose bool `flag-help:"verbose"`
 }
@@ -63,13 +62,12 @@ func init() {
 	rootCmd.AddCommand(digestCmd)
 
 	dc = &digestConfig{
-		SEBAK:      config.NewSEBAK(),
-		Digest:     config.NewDigest(),
-		System:     config.NewSystem(),
-		Network:    config.NewNetwork(),
-		Storage:    config.NewStorage0(),
-		NewStorage: config.NewNewStorage(),
-		Log:        config.NewLogs(),
+		SEBAK:   config.NewSEBAK(),
+		Digest:  config.NewDigest(),
+		System:  config.NewSystem(),
+		Network: config.NewNetwork(),
+		Storage: config.NewStorage(),
+		Log:     config.NewLogs(),
 	}
 	digestConfigManager = cvc.NewManager("naru", dc, digestCmd, viper.New())
 }
@@ -88,10 +86,10 @@ func runDigest(dc *digestConfig) error {
 		}
 	}
 
-	//st, err := leveldbstorage.NewStorage(dc.NewStorage.LevelDB)
-	st, err := mongostorage.NewStorage(dc.NewStorage.Mongo)
+	//st, err := leveldbstorage.NewStorage(dc.Storage.LevelDB)
+	st, err := mongostorage.NewStorage(dc.Storage.Mongo)
 	if err != nil {
-		log.Crit("failed to load storage", "config", dc.NewStorage, "error", err)
+		log.Crit("failed to load storage", "config", dc.Storage, "error", err)
 		return err
 	}
 	defer st.Close()
