@@ -55,7 +55,7 @@ func NewDocument(key string, value interface{}) (*Document, error) {
 		return nil, err
 	}
 
-	if _, err := bson.Marshal(bson.M{"_v": encoded}); err != nil {
+	if _, err := Serialize(bson.M{"_v": encoded}); err != nil {
 		return nil, err
 	}
 
@@ -76,7 +76,7 @@ func (d *Document) BSONDocument() bson.M {
 }
 
 func (d *Document) MarshalBSON() ([]byte, error) {
-	return bson.Marshal(d.BSONDocument())
+	return Serialize(d.BSONDocument())
 }
 
 func UnmarshalDocument(b []byte, v interface{}) (*Document, error) {
@@ -104,39 +104,6 @@ func UnmarshalDocumentValue(b []byte, v interface{}) (string, error) {
 
 	return key, nil
 }
-
-/*
-func validateDocumentByRaw(b []byte) (string, bson.Raw, error) {
-	raw := bson.Raw(b)
-	if err := raw.Validate(); err != nil {
-		return "", bson.Raw{}, err
-	}
-
-	var key string
-
-	fk, err := raw.LookupErr("_k")
-	if err != nil {
-		return "", bson.Raw{}, err
-	} else if k, ok := fk.StringValueOK(); !ok {
-		return "", bson.Raw{}, InvalidDocumentKey.New()
-	} else {
-		key = k
-	}
-
-	var v bson.Raw
-	fv, err := raw.LookupErr("_v")
-	if err != nil {
-		return "", bson.Raw{}, err
-	} else if d, ok := fv.DocumentOK(); !ok {
-		fmt.Println("ddddddddddddeeeeeeeee", string(fv.Value))
-		return "", bson.Raw{}, InvalidDocumentValue.New()
-	} else {
-		v = d
-	}
-
-	return key, v, nil
-}
-*/
 
 func validateDocumentByRaw(b []byte) (string, bson.RawValue, error) {
 	raw := bson.Raw(b)
@@ -232,118 +199,6 @@ func encodeValue(v interface{}) (bsontype.Type, interface{}, error) {
 	return bt, m, nil
 }
 
-/*
-func DecodeMongoValue(m f interface{}) error {
-	var err error
-	var o interface{} = v.I
-
-	switch v.T {
-	case Bool:
-		o = v.I.(bool)
-	case Int:
-		o = int(v.I.(int32))
-	case Int8:
-		o = int8(v.I.(int32))
-	case Int16:
-		o = int16(v.I.(int32))
-	case Int32:
-		o = v.I.(int32)
-	case Int64:
-		o = v.I.(int64)
-	case Uint:
-		if i, err := convertDecimal128ToUint(v.I, 32); err != nil {
-			return err
-		} else {
-			o = uint(i.(uint64))
-		}
-	case Uint8:
-		if i, err := convertDecimal128ToUint(v.I, 8); err != nil {
-			return err
-		} else {
-			o = uint8(i.(uint64))
-		}
-	case Uint16:
-		if i, err := convertDecimal128ToUint(v.I, 16); err != nil {
-			return err
-		} else {
-			o = uint16(i.(uint64))
-		}
-	case Uint32:
-		if i, err := convertDecimal128ToUint(v.I, 32); err != nil {
-			return err
-		} else {
-			o = uint32(i.(uint64))
-		}
-	case Uint64:
-		if i, err := convertDecimal128ToUint(v.I, 64); err != nil {
-			return err
-		} else {
-			o = i.(uint64)
-		}
-		//case reflect.Uintptr:
-	case Float32:
-		switch v.I.(type) {
-		case float32:
-		case float64:
-			o = float32(v.I.(float64))
-		}
-	case Float64:
-		o = v.I.(float64)
-	//case reflect.Complex64, reflect.Complex128:
-	//case reflect.Chan:
-	//case reflect.Func:
-	//case reflect.Interface:
-	case Map:
-		var b []byte
-		if b, err = bson.Marshal(v.I); err != nil {
-			return err
-		}
-
-		if err = bson.Unmarshal(b, f); err != nil {
-			return err
-		}
-		return nil
-	case Ptr:
-	case String:
-	case Struct:
-		var b []byte
-		if b, err = bson.Marshal(v.I); err != nil {
-			return err
-		}
-
-		if err = bson.Unmarshal(b, f); err != nil {
-			return err
-		}
-		return nil
-	//case reflect.UnsafePointer:
-	case Array, Slice:
-		var b []byte
-		if b, err = bson.Marshal(bson.M{"a": v.I}); err != nil {
-			return err
-		}
-
-		if err = bson.Raw(b).Lookup("a").Unmarshal(f); err != nil {
-			return err
-		}
-		return nil
-	default:
-		return InvalidDocumentValue.New()
-	}
-
-	reflect.ValueOf(f).Elem().Set(reflect.ValueOf(o))
-
-	return nil
-}
-*/
-
-func convertDecimal128ToUint0(i interface{}, bitSize int) (interface{}, error) {
-	if d, ok := i.(primitive.Decimal128); !ok {
-		return nil, errors.New("not primitive.Decimal128 type")
-	} else {
-		return strconv.ParseUint(d.String(), 10, bitSize)
-	}
-}
-
 func convertDecimal128ToUint(rv bson.RawValue, bitSize int) (interface{}, error) {
 	d, ok := rv.Decimal128OK()
 	if !ok {
@@ -389,7 +244,7 @@ func decodeValue(rv bson.RawValue, f interface{}) error {
 			o = i.(uint64)
 		}
 	default:
-		return rv.Unmarshal(f)
+		return rv.UnmarshalWithRegistry(DefaultBSONRegistry, f)
 	}
 
 	reflect.ValueOf(f).Elem().Set(reflect.ValueOf(o))

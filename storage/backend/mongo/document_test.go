@@ -1,14 +1,19 @@
 package mongostorage
 
 import (
+	"fmt"
 	"reflect"
 	"runtime/debug"
 	"strconv"
 	"testing"
 
+	sebakcommon "boscoin.io/sebak/lib/common"
 	"github.com/stretchr/testify/suite"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsoncodec"
+	"go.mongodb.org/mongo-driver/bson/bsonrw"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type testMongoDocument struct {
@@ -343,6 +348,165 @@ func (t *testMongoValue) TestMarshalStruct() {
 		t.NoError(err)
 		t.Equal(reflect.Slice, reflect.TypeOf(f).Kind())
 	}
+}
+
+/*
+
+func (a Amount) MarshalBSONValue() (bsontype.Type, []byte, error) {
+	n, err := primitive.ParseDecimal128(a.String())
+	if err != nil {
+		return bsontype.Decimal128, nil, err
+	}
+
+	return bsontype.Decimal128, bsoncore.AppendDecimal128(nil, n), nil
+}
+
+func (a *Amount) UnmarshalBSON(b []byte) error {
+	val := bson.RawValue{
+		Type:  bsontype.Decimal128,
+		Value: b,
+	}
+	var d primitive.Decimal128
+	if err := val.Unmarshal(&d); err != nil {
+		return err
+	}
+
+	c, err := strconv.ParseUint(d.String(), 10, 64)
+	if err != nil {
+		return err
+	}
+
+	*a = Amount(c)
+
+	return nil
+}
+*/
+
+func (t *testMongoValue) TestEncodeDecodeSEBAKAmount() {
+	{ // with using bson default registry
+		rb := bson.NewRegistryBuilder()
+		registry := rb.Build()
+
+		var k uint64 = 10000000000000000000
+		amount := sebakcommon.Amount(k)
+		b, err := bson.MarshalWithRegistry(registry, bson.M{"A": &amount})
+		t.Error(err, "10000000000000000000 overflows int64")
+		t.Empty(b)
+	}
+
+	{ // with custom encoder
+		var tSEBAKAmount reflect.Type = reflect.TypeOf(sebakcommon.Amount(0))
+		SEBAKAmountEncodeValue := func(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, val reflect.Value) error {
+			if !val.IsValid() || val.Type() != tSEBAKAmount {
+				return bsoncodec.ValueEncoderError{Name: "SEBAKAmountEncodeValue", Types: []reflect.Type{tSEBAKAmount}, Received: val}
+			}
+
+			n, err := primitive.ParseDecimal128(val.Interface().(sebakcommon.Amount).String())
+			if err != nil {
+				return err
+			}
+			return vw.WriteDecimal128(n)
+		}
+
+		rb := bson.NewRegistryBuilder()
+		rb.RegisterEncoder(tSEBAKAmount, bsoncodec.ValueEncoderFunc(SEBAKAmountEncodeValue))
+		registry := rb.Build()
+
+		var k uint64 = 10000000000000000000
+		amount := sebakcommon.Amount(k)
+		{
+			b, err := bson.MarshalWithRegistry(registry, bson.M{"A": &amount})
+			t.NoError(err)
+			t.NotEmpty(b)
+		}
+		{
+			b, err := bson.MarshalWithRegistry(registry, bson.M{"A": amount})
+			t.NoError(err)
+			t.NotEmpty(b)
+		}
+	}
+
+	{ // with custom decoder
+		var tSEBAKAmount reflect.Type = reflect.TypeOf(sebakcommon.Amount(0))
+		SEBAKAmountEncodeValue := func(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, val reflect.Value) error {
+			if !val.IsValid() || val.Type() != tSEBAKAmount {
+				return bsoncodec.ValueEncoderError{Name: "SEBAKAmountEncodeValue", Types: []reflect.Type{tSEBAKAmount}, Received: val}
+			}
+
+			n, err := primitive.ParseDecimal128(val.Interface().(sebakcommon.Amount).String())
+			if err != nil {
+				return err
+			}
+			return vw.WriteDecimal128(n)
+		}
+
+		SEBAKAmountDecodeValue := func(dctx bsoncodec.DecodeContext, vr bsonrw.ValueReader, val reflect.Value) error {
+			if vr.Type() != bsontype.Decimal128 {
+				return fmt.Errorf("cannot decode %v into a primitive.Decimal128", vr.Type())
+			}
+
+			if !val.CanSet() || val.Type() != tSEBAKAmount {
+				return bsoncodec.ValueDecoderError{Name: "SEBAKAmountDecodeValue", Types: []reflect.Type{tSEBAKAmount}, Received: val}
+			}
+
+			d128, err := vr.ReadDecimal128()
+
+			c, err := strconv.ParseUint(d128.String(), 10, 64)
+			if err != nil {
+				return err
+			}
+
+			val.Set(reflect.ValueOf(sebakcommon.Amount(c)))
+			return nil
+		}
+
+		rb := bson.NewRegistryBuilder()
+		rb.RegisterEncoder(tSEBAKAmount, bsoncodec.ValueEncoderFunc(SEBAKAmountEncodeValue))
+		rb.RegisterDecoder(tSEBAKAmount, bsoncodec.ValueDecoderFunc(SEBAKAmountDecodeValue))
+		registry := rb.Build()
+
+		var k uint64 = 10000000000000000000
+		amount := sebakcommon.Amount(k)
+		encoded, _ := bson.MarshalWithRegistry(
+			registry,
+			struct {
+				A sebakcommon.Amount
+			}{A: amount})
+
+		decodedAmount := &(struct {
+			A sebakcommon.Amount
+		}{})
+
+		err := bson.UnmarshalWithRegistry(registry, encoded, decodedAmount)
+		t.NoError(err)
+		t.Equal(amount, decodedAmount.A)
+	}
+}
+
+func (t *testMongoValue) TestSerializeSEBAKAmount() {
+	var k uint64 = 10000000000000000000
+	amount := sebakcommon.Amount(k)
+	var encoded []byte
+	{
+		var err error
+		encoded, err = Serialize(
+			struct {
+				A sebakcommon.Amount
+			}{A: amount})
+		t.NoError(err)
+		t.NotEmpty(encoded)
+	}
+
+	{
+		decodedAmount := &(struct {
+			A sebakcommon.Amount
+		}{})
+
+		err := Deserialize(encoded, decodedAmount)
+		t.NoError(err)
+		t.Equal(amount, decodedAmount.A)
+	}
+
 }
 
 func TestMongoValue(t *testing.T) {
