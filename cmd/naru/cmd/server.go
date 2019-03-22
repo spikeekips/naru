@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"net/http/pprof"
-	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -17,9 +16,7 @@ import (
 	"github.com/spikeekips/naru/digest"
 	"github.com/spikeekips/naru/sebak"
 	"github.com/spikeekips/naru/storage"
-	leveldbstorage "github.com/spikeekips/naru/storage/backend/leveldb"
 	"github.com/spikeekips/naru/storage/item"
-	leveldbitem "github.com/spikeekips/naru/storage/item/leveldb"
 )
 
 var (
@@ -52,7 +49,9 @@ func init() {
 				cmdcommon.PrintError(c, err)
 			}
 
-			log.Debug("config merged", serverConfigManager.ConfigPprint()...)
+			cs := serverConfigManager.ConfigPprint()
+			cs = append(cs, "\n\tstorage-backend", sc.Storage.Backend().Type())
+			log.Debug("config merged", cs...)
 
 			SetAllLogging(sc.Log)
 
@@ -86,29 +85,18 @@ func runServer(sc *ServerConfig) error {
 
 	log.Debug("sebak nodeinfo", "nodeinfo", nodeInfo)
 
+	st, err := NewStorageByConfig(sc.Storage)
+	if err != nil {
+		return err
+	}
+
+	/* TODO
 	if sc.Digest.Init {
 		if err = os.RemoveAll(sc.Storage.LevelDB.Path); err != nil {
 			log.Crit("failed to remove storage", "directory", sc.Storage.LevelDB.Path, "error", err)
 			return err
 		}
 	}
-
-	st, err := leveldbstorage.NewStorage(sc.Storage.LevelDB)
-	if err != nil {
-		log.Crit("failed to load storage", "config", sc.Storage, "error", err)
-		return err
-	}
-	defer st.Close()
-	leveldbitem.EventSync()
-
-	/*
-		st, err := mongostorage.NewStorage(sc.Storage.Mongo)
-		if err != nil {
-			log.Crit("failed to load storage", "config", sc.Storage, "error", err)
-			return err
-		}
-		defer st.Close()
-		mongoitem.EventSync()
 	*/
 
 	storage.Observer.On(item.EventOnAfterSaveBlock, func(v ...interface{}) {

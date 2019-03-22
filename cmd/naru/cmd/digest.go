@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -12,8 +10,6 @@ import (
 	"github.com/spikeekips/naru/config"
 	"github.com/spikeekips/naru/digest"
 	"github.com/spikeekips/naru/sebak"
-	mongostorage "github.com/spikeekips/naru/storage/backend/mongo"
-	mongoitem "github.com/spikeekips/naru/storage/item/mongo"
 )
 
 var (
@@ -46,7 +42,9 @@ func init() {
 				cmdcommon.PrintError(c, err)
 			}
 
-			log.Debug("config merged", digestConfigManager.ConfigPprint()...)
+			cs := serverConfigManager.ConfigPprint()
+			cs = append(cs, "\n\tstorage-backend", dc.Storage.Backend().Type())
+			log.Debug("config merged", cs...)
 
 			SetAllLogging(dc.Log)
 
@@ -79,22 +77,19 @@ func runDigest(dc *digestConfig) error {
 	}
 	log.Debug("sebak nodeinfo", "nodeinfo", nodeInfo)
 
+	/* TODO
 	if dc.Digest.Init {
 		if err = os.RemoveAll(dc.Storage.LevelDB.Path); err != nil {
 			log.Crit("failed to remove storage", "directory", dc.Storage.LevelDB.Path, "error", err)
 			return err
 		}
 	}
+	*/
 
-	//st, err := leveldbstorage.NewStorage(dc.Storage.LevelDB)
-	st, err := mongostorage.NewStorage(dc.Storage.Mongo)
+	st, err := NewStorageByConfig(dc.Storage)
 	if err != nil {
-		log.Crit("failed to load storage", "config", dc.Storage, "error", err)
 		return err
 	}
-	defer st.Close()
-
-	mongoitem.EventSync()
 
 	provider := sebak.NewJSONRPCStorageProvider(dc.SEBAK.JSONRpc)
 	sst := sebak.NewStorage(provider)

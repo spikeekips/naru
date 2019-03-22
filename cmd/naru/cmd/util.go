@@ -15,6 +15,10 @@ import (
 	"github.com/spikeekips/naru/digest"
 	"github.com/spikeekips/naru/sebak"
 	"github.com/spikeekips/naru/storage"
+	leveldbstorage "github.com/spikeekips/naru/storage/backend/leveldb"
+	mongostorage "github.com/spikeekips/naru/storage/backend/mongo"
+	leveldbitem "github.com/spikeekips/naru/storage/item/leveldb"
+	mongoitem "github.com/spikeekips/naru/storage/item/mongo"
 )
 
 func getNodeInfo(endpoint *sebakcommon.Endpoint) (sebaknode.NodeInfo, error) {
@@ -55,4 +59,26 @@ func SetAllLogging(c *config.Logs) {
 	c.Package.SEBAK.SetLogger(sebak.Log())
 	c.Package.Storage.SetLogger(storage.Log())
 	c.Package.Query.SetLogger(storage.Log())
+}
+
+func NewStorageByConfig(c *config.Storage) (storage.Storage, error) {
+	var st storage.Storage
+	var err error
+
+	switch c.Backend().Type() {
+	case "mongo":
+		if st, err = mongostorage.NewStorage(c.Mongo); err != nil {
+			log.Crit("failed to load storage", "config", c, "error", err)
+			return nil, err
+		}
+		mongoitem.EventSync()
+	case "leveldb":
+		if st, err = leveldbstorage.NewStorage(c.LevelDB); err != nil {
+			log.Crit("failed to load storage", "config", c, "error", err)
+			return nil, err
+		}
+		leveldbitem.EventSync()
+	}
+
+	return st, nil
 }

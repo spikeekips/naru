@@ -355,6 +355,8 @@ func convertDecimal128ToUint(rv bson.RawValue, bitSize int) (interface{}, error)
 func decodeValue(rv bson.RawValue, f interface{}) error {
 	var o interface{}
 
+	// TODO support mongo timestamp
+
 	switch Hint(reflect.TypeOf(f).Elem().Kind()) {
 	case Uint:
 		if i, err := convertDecimal128ToUint(rv, 32); err != nil {

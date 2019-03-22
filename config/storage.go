@@ -21,9 +21,21 @@ type Storage struct {
 
 func NewStorage() *Storage {
 	return &Storage{
-		LevelDB: NewLevelDBStorage(),
-		Mongo:   NewMongoStorage(),
+		LevelDB: NewLevelDBStorage(), // by default, leveldb will be used
+		//Mongo:   NewMongoStorage(),
 	}
+}
+
+func (s *Storage) Backend() Backend {
+	if s.Mongo != nil && s.Mongo.DB != "" && s.Mongo.URI != nil {
+		return s.Mongo
+	}
+
+	return s.LevelDB
+}
+
+type Backend interface {
+	Type() string
 }
 
 type LevelDBStorage struct {
