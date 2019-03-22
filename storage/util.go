@@ -1,4 +1,4 @@
-package newstorage
+package storage
 
 import (
 	"encoding"

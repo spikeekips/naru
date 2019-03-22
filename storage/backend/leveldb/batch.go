@@ -8,7 +8,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/spikeekips/naru/common"
-	"github.com/spikeekips/naru/newstorage"
+	"github.com/spikeekips/naru/storage"
 )
 
 type Batch struct {
@@ -33,7 +33,7 @@ func (b *Batch) Get(k string, v interface{}) error {
 	return b.s.Get(k, v)
 }
 
-func (b *Batch) Iterator(prefix string, v interface{}, options newstorage.ListOptions) (func() (newstorage.Record, bool), func()) {
+func (b *Batch) Iterator(prefix string, v interface{}, options storage.ListOptions) (func() (storage.Record, bool), func()) {
 	return b.s.Iterator(prefix, v, options)
 }
 
@@ -42,7 +42,7 @@ func (b *Batch) Insert(k string, v interface{}) error {
 		return err
 	}
 
-	encoded, err := newstorage.Serialize(v)
+	encoded, err := storage.Serialize(v)
 	if err != nil {
 		return setError(err)
 	}
@@ -56,7 +56,7 @@ func (b *Batch) Update(k string, v interface{}) error {
 		return err
 	}
 
-	encoded, err := newstorage.Serialize(v)
+	encoded, err := storage.Serialize(v)
 	if err != nil {
 		return setError(err)
 	}
@@ -74,7 +74,7 @@ func (b *Batch) Delete(k string) error {
 	return nil
 }
 
-func (b *Batch) MultipleInsert(items ...newstorage.Value) error {
+func (b *Batch) MultipleInsert(items ...storage.Value) error {
 	if len(items) < 1 {
 		return setError(errors.New("empty values"))
 	}
@@ -87,7 +87,7 @@ func (b *Batch) MultipleInsert(items ...newstorage.Value) error {
 
 	var l [][2][]byte
 	for _, i := range items {
-		encoded, err := newstorage.Serialize(i.Value)
+		encoded, err := storage.Serialize(i.Value)
 		if err != nil {
 			return setError(err)
 		}
@@ -102,7 +102,7 @@ func (b *Batch) MultipleInsert(items ...newstorage.Value) error {
 	return nil
 }
 
-func (b *Batch) MultipleUpdate(items ...newstorage.Value) error {
+func (b *Batch) MultipleUpdate(items ...storage.Value) error {
 	if len(items) < 1 {
 		return setError(errors.New("empty values"))
 	}
@@ -115,7 +115,7 @@ func (b *Batch) MultipleUpdate(items ...newstorage.Value) error {
 
 	var l [][2][]byte
 	for _, i := range items {
-		encoded, err := newstorage.Serialize(i.Value)
+		encoded, err := storage.Serialize(i.Value)
 		if err != nil {
 			return setError(err)
 		}
@@ -166,7 +166,7 @@ func (b *Batch) Write() error {
 			es = append(es, n)
 		}
 
-		newstorage.Observer.Trigger(strings.Join(es, " "), e.Items...)
+		storage.Observer.Trigger(strings.Join(es, " "), e.Items...)
 	}
 
 	err := setError(b.s.Core().Write(b.b, nil))
@@ -183,7 +183,7 @@ func (b *Batch) Write() error {
 			events = append(events, n)
 		}
 
-		newstorage.Observer.Trigger(strings.Join(events, " "), e.Items...)
+		storage.Observer.Trigger(strings.Join(events, " "), e.Items...)
 	}
 
 	b.clearEvents()
@@ -202,7 +202,7 @@ func (b *Batch) Close() error {
 	return b.s.Close()
 }
 
-func (b *Batch) Batch() newstorage.BatchStorage {
+func (b *Batch) Batch() storage.BatchStorage {
 	return b
 }
 

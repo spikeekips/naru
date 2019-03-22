@@ -5,8 +5,8 @@ import (
 
 	sebakapi "boscoin.io/sebak/lib/node/runner/api"
 
-	storage "github.com/spikeekips/naru/newstorage"
-	"github.com/spikeekips/naru/newstorage/item"
+	"github.com/spikeekips/naru/storage"
+	"github.com/spikeekips/naru/storage/item"
 )
 
 type OperationsByAccountStreamHandler struct {

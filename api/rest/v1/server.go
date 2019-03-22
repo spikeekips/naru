@@ -17,7 +17,7 @@ import (
 	"github.com/spikeekips/naru/api/rest"
 	cachebackend "github.com/spikeekips/naru/cache/backend"
 	"github.com/spikeekips/naru/config"
-	storage "github.com/spikeekips/naru/newstorage"
+	"github.com/spikeekips/naru/storage"
 )
 
 type Server struct {

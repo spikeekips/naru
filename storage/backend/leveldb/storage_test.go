@@ -9,7 +9,7 @@ import (
 
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/config"
-	"github.com/spikeekips/naru/newstorage"
+	"github.com/spikeekips/naru/storage"
 )
 
 type testLevelDBStorage struct {
@@ -52,13 +52,13 @@ func (t *testLevelDBStorage) TestInsertAndGet() {
 func (t *testLevelDBStorage) TestGetUnknownKey() {
 	var returned string
 	err := t.s.Get("whoareyou?", &returned)
-	t.True(newstorage.NotFound.Equal(err))
+	t.True(storage.NotFound.Equal(err))
 }
 
 func (t *testLevelDBStorage) TestIterator() {
-	var inserted []newstorage.Record
+	var inserted []storage.Record
 	for i := 0; i < 20; i++ {
-		item := newstorage.Record{
+		item := storage.Record{
 			Key:   fmt.Sprintf("item-%02d", i),
 			Value: []byte(common.RandomUUID()),
 		}
@@ -71,11 +71,11 @@ func (t *testLevelDBStorage) TestIterator() {
 	var limit uint64
 	{
 		limit = 5
-		options := newstorage.NewDefaultListOptions(false, nil, limit)
+		options := storage.NewDefaultListOptions(false, nil, limit)
 		iter, cls := t.s.Iterator("item", []byte{}, options)
 		defer cls()
 
-		var items []newstorage.Record
+		var items []storage.Record
 		for {
 			item, next := iter()
 			if !next {
@@ -94,11 +94,11 @@ func (t *testLevelDBStorage) TestIterator() {
 
 	{
 		limit = uint64(len(inserted) + 10)
-		options := newstorage.NewDefaultListOptions(false, nil, limit)
+		options := storage.NewDefaultListOptions(false, nil, limit)
 		iter, cls := t.s.Iterator("item", []byte{}, options)
 		defer cls()
 
-		var items []newstorage.Record
+		var items []storage.Record
 		for {
 			item, next := iter()
 			if len(items) == len(inserted) {
@@ -123,11 +123,11 @@ func (t *testLevelDBStorage) TestIteratorEmpty() {
 	var limit uint64
 	{
 		limit = 5
-		options := newstorage.NewDefaultListOptions(false, nil, limit)
+		options := storage.NewDefaultListOptions(false, nil, limit)
 		iter, cls := t.s.Iterator("item", []byte{}, options)
 		defer cls()
 
-		var items []newstorage.Record
+		var items []storage.Record
 		for {
 			item, next := iter()
 			if !next {
@@ -152,7 +152,7 @@ func (t *testLevelDBStorage) TestBatch() {
 
 	{
 		err := t.s.Get(key, nil)
-		t.True(newstorage.NotFound.Equal(err))
+		t.True(storage.NotFound.Equal(err))
 	}
 
 	err := batch.Write()
@@ -168,14 +168,14 @@ func (t *testLevelDBStorage) TestBatch() {
 
 func (t *testLevelDBStorage) TestEvent() {
 	event := common.RandomUUID()
-	defer newstorage.Observer.Off(event)
+	defer storage.Observer.Off(event)
 
 	evented := make(chan interface{})
 	done := make(chan bool)
 	defer close(evented)
 	defer close(done)
 
-	newstorage.Observer.On(event, func(args ...interface{}) {
+	storage.Observer.On(event, func(args ...interface{}) {
 		evented <- args
 	})
 
@@ -207,14 +207,14 @@ func (t *testLevelDBStorage) TestEvent() {
 
 func (t *testLevelDBStorage) TestBatchEventWillNotTriggerBeforeWrite() {
 	event := common.RandomUUID()
-	defer newstorage.Observer.Off(event)
+	defer storage.Observer.Off(event)
 
 	evented := make(chan interface{}, 1)
 	fired := make(chan interface{}, 1)
 	defer close(evented)
 	defer close(fired)
 
-	newstorage.Observer.On(event, func(args ...interface{}) {
+	storage.Observer.On(event, func(args ...interface{}) {
 		evented <- args
 	})
 
@@ -248,14 +248,14 @@ func (t *testLevelDBStorage) TestBatchEventWillNotTriggerBeforeWrite() {
 
 func (t *testLevelDBStorage) TestBatchEventTriggerAfterWrite() {
 	event := common.RandomUUID()
-	defer newstorage.Observer.Off(event)
+	defer storage.Observer.Off(event)
 
 	evented := make(chan interface{})
 	done := make(chan bool)
 	defer close(evented)
 	defer close(done)
 
-	newstorage.Observer.On(event, func(args ...interface{}) {
+	storage.Observer.On(event, func(args ...interface{}) {
 		evented <- args
 	})
 
@@ -286,14 +286,14 @@ func (t *testLevelDBStorage) TestBatchEventTriggerAfterWrite() {
 
 func (t *testLevelDBStorage) TestBatchEventTriggerSynchronous() {
 	event := common.RandomUUID()
-	defer newstorage.Observer.Off(event)
+	defer storage.Observer.Off(event)
 
 	evented := make(chan int)
 	done := make(chan []int)
 	defer close(evented)
 	defer close(done)
 
-	newstorage.Observer.On(event, func(args ...interface{}) {
+	storage.Observer.On(event, func(args ...interface{}) {
 		time.Sleep(time.Second * 1)
 		evented <- 0
 	})
@@ -332,14 +332,14 @@ func (t *testLevelDBStorage) TestBatchEventTriggerSynchronous() {
 
 func (t *testLevelDBStorage) TestBatchEventTriggerAsynchronous() {
 	event := common.RandomUUID()
-	defer newstorage.Observer.Off(event)
+	defer storage.Observer.Off(event)
 
 	evented := make(chan int)
 	done := make(chan []int)
 	defer close(evented)
 	defer close(done)
 
-	newstorage.Observer.Async(event, func(args ...interface{}) {
+	storage.Observer.Async(event, func(args ...interface{}) {
 		time.Sleep(time.Second * 1)
 		evented <- 0
 	})

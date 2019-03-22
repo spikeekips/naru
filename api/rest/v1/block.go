@@ -12,7 +12,7 @@ import (
 	sebakresource "boscoin.io/sebak/lib/node/runner/api/resource"
 
 	"github.com/spikeekips/naru/api/rest"
-	"github.com/spikeekips/naru/newstorage/item"
+	"github.com/spikeekips/naru/storage/item"
 )
 
 func (h *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {

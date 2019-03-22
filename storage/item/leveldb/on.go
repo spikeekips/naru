@@ -5,27 +5,27 @@ import (
 
 	sebaktransaction "boscoin.io/sebak/lib/transaction"
 
-	"github.com/spikeekips/naru/newstorage"
-	"github.com/spikeekips/naru/newstorage/item"
+	"github.com/spikeekips/naru/storage"
+	"github.com/spikeekips/naru/storage/item"
 )
 
 func EventSync() {
-	newstorage.Observer.Sync("OnAfterSaveAccount", OnAfterSaveAccount)
-	newstorage.Observer.Sync("OnAfterSaveBlock", OnAfterSaveBlock)
-	newstorage.Observer.Sync("OnAfterSaveTransaction", OnAfterSaveTransaction)
-	newstorage.Observer.Sync("OnAfterSaveOperation", OnAfterSaveOperation)
+	storage.Observer.Sync("OnAfterSaveAccount", OnAfterSaveAccount)
+	storage.Observer.Sync("OnAfterSaveBlock", OnAfterSaveBlock)
+	storage.Observer.Sync("OnAfterSaveTransaction", OnAfterSaveTransaction)
+	storage.Observer.Sync("OnAfterSaveOperation", OnAfterSaveOperation)
 }
 
-func OnAfterSaveAccount(st newstorage.Storage, account item.Account) {
+func OnAfterSaveAccount(st storage.Storage, account item.Account) {
 }
 
-func OnAfterSaveBlock(st newstorage.Storage, block item.Block) {
+func OnAfterSaveBlock(st storage.Storage, block item.Block) {
 	if err := st.Insert(item.GetBlockHeightKey(block.Height), block.Hash); err != nil {
 		return
 	}
 }
 
-func OnAfterSaveTransaction(st newstorage.Storage, transaction item.Transaction, tx sebaktransaction.Transaction, block item.Block) {
+func OnAfterSaveTransaction(st storage.Storage, transaction item.Transaction, tx sebaktransaction.Transaction, block item.Block) {
 	if err := st.Insert(item.GetTransactionBlockKey(block.Height), transaction.Hash); err != nil {
 		return
 	}
@@ -40,7 +40,7 @@ func OnAfterSaveTransaction(st newstorage.Storage, transaction item.Transaction,
 	}
 }
 
-func OnAfterSaveOperation(st newstorage.Storage, operation item.Operation) {
+func OnAfterSaveOperation(st storage.Storage, operation item.Operation) {
 	if err := st.Insert(item.GetOperationAccountRelatedKey(operation.Source, operation.Height), operation.Hash); err != nil {
 		return
 	}

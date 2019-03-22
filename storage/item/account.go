@@ -5,7 +5,7 @@ import (
 
 	sebakblock "boscoin.io/sebak/lib/block"
 
-	storage "github.com/spikeekips/naru/newstorage"
+	"github.com/spikeekips/naru/storage"
 )
 
 type Account struct {

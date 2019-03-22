@@ -8,8 +8,8 @@ import (
 	sebakstorage "boscoin.io/sebak/lib/storage"
 	sebaktransaction "boscoin.io/sebak/lib/transaction"
 
-	storage "github.com/spikeekips/naru/newstorage"
-	"github.com/spikeekips/naru/newstorage/item"
+	"github.com/spikeekips/naru/storage"
+	"github.com/spikeekips/naru/storage/item"
 )
 
 func GetBlockByHeight(s *Storage, height uint64) (block sebakblock.Block, err error) {

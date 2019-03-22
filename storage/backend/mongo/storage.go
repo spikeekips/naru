@@ -12,7 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/spikeekips/naru/config"
-	"github.com/spikeekips/naru/newstorage"
+	"github.com/spikeekips/naru/storage"
 )
 
 var defaultCollectionName string = "default"
@@ -75,7 +75,7 @@ func (b *Storage) Close() error {
 	return b.c.Disconnect(context.Background())
 }
 
-func (b *Storage) Batch() newstorage.BatchStorage {
+func (b *Storage) Batch() storage.BatchStorage {
 	return NewBatch(b)
 }
 
@@ -98,7 +98,7 @@ func (b *Storage) MustExist(k string) error {
 	if err != nil {
 		return err
 	} else if !exists {
-		return newstorage.NotFound.New()
+		return storage.NotFound.New()
 	}
 
 	return nil
@@ -109,7 +109,7 @@ func (b *Storage) MustNotExist(k string) error {
 	if err != nil {
 		return err
 	} else if exists {
-		return newstorage.AlreadyExists.New()
+		return storage.AlreadyExists.New()
 	}
 
 	return nil
@@ -134,7 +134,7 @@ func (b *Storage) Get(k string, v interface{}) error {
 	return err
 }
 
-func (b *Storage) Iterator(prefix string, v interface{}, opt newstorage.ListOptions) (func() (newstorage.Record, bool), func()) {
+func (b *Storage) Iterator(prefix string, v interface{}, opt storage.ListOptions) (func() (storage.Record, bool), func()) {
 	q := bson.M{"_k": bson.M{"$regex": "^" + regexp.QuoteMeta(resolveKey(prefix))}}
 
 	reverse := 1
@@ -164,24 +164,24 @@ func (b *Storage) Iterator(prefix string, v interface{}, opt newstorage.ListOpti
 
 	cur, err := b.Collection().Find(context.Background(), q, mopt)
 
-	return func() (newstorage.Record, bool) {
+	return func() (storage.Record, bool) {
 			// TODO err should be returned
 			if err != nil {
-				return newstorage.Record{}, false
+				return storage.Record{}, false
 			}
 
 			hasNext := cur.Next(context.Background())
 			if !hasNext {
-				return newstorage.Record{}, false
+				return storage.Record{}, false
 			}
 
 			nv := reflect.New(reflect.TypeOf(v)).Interface()
 			key, err := UnmarshalDocumentValue([]byte(cur.Current), nv)
 			if err != nil {
-				return newstorage.Record{}, false
+				return storage.Record{}, false
 			}
 
-			return newstorage.NewRecord(key, reflect.ValueOf(nv).Elem().Interface()), true
+			return storage.NewRecord(key, reflect.ValueOf(nv).Elem().Interface()), true
 		}, func() {
 			if err != nil {
 				return
@@ -227,11 +227,11 @@ func (b *Storage) Delete(k string) error {
 	return err
 }
 
-func (b *Storage) MultipleInsert(items ...newstorage.Value) error {
+func (b *Storage) MultipleInsert(items ...storage.Value) error {
 	return nil
 }
 
-func (b *Storage) MultipleUpdate(items ...newstorage.Value) error {
+func (b *Storage) MultipleUpdate(items ...storage.Value) error {
 	return nil
 }
 
@@ -240,8 +240,7 @@ func (b *Storage) MultipleDelete(keys ...string) error {
 }
 
 func (b *Storage) Event(event string, values ...interface{}) {
-	newstorage.Observer.Trigger(event, values...)
-	return
+	storage.Observer.Trigger(event, values...)
 }
 
 func resolveKey(key string) string {

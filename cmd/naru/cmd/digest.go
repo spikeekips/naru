@@ -11,9 +11,9 @@ import (
 	"github.com/spikeekips/cvc"
 	"github.com/spikeekips/naru/config"
 	"github.com/spikeekips/naru/digest"
-	mongostorage "github.com/spikeekips/naru/newstorage/backend/mongo"
-	mongoitem "github.com/spikeekips/naru/newstorage/item/mongo"
 	"github.com/spikeekips/naru/sebak"
+	mongostorage "github.com/spikeekips/naru/storage/backend/mongo"
+	mongoitem "github.com/spikeekips/naru/storage/item/mongo"
 )
 
 var (

@@ -1,4 +1,4 @@
-package newstorage
+package storage
 
 import (
 	"github.com/spikeekips/naru/common"

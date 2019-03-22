@@ -1,4 +1,4 @@
-package newstorage
+package storage
 
 var DefaultMaxLimitListOptions uint64 = 100
 

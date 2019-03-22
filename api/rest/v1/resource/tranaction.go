@@ -7,7 +7,7 @@ import (
 
 	sebakresource "boscoin.io/sebak/lib/node/runner/api/resource"
 
-	"github.com/spikeekips/naru/newstorage/item"
+	"github.com/spikeekips/naru/storage/item"
 )
 
 type Transaction struct {

@@ -15,11 +15,11 @@ import (
 	cachebackend "github.com/spikeekips/naru/cache/backend"
 	"github.com/spikeekips/naru/config"
 	"github.com/spikeekips/naru/digest"
-	storage "github.com/spikeekips/naru/newstorage"
-	leveldbstorage "github.com/spikeekips/naru/newstorage/backend/leveldb"
-	"github.com/spikeekips/naru/newstorage/item"
-	leveldbitem "github.com/spikeekips/naru/newstorage/item/leveldb"
 	"github.com/spikeekips/naru/sebak"
+	"github.com/spikeekips/naru/storage"
+	leveldbstorage "github.com/spikeekips/naru/storage/backend/leveldb"
+	"github.com/spikeekips/naru/storage/item"
+	leveldbitem "github.com/spikeekips/naru/storage/item/leveldb"
 )
 
 var (

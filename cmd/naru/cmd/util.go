@@ -13,8 +13,8 @@ import (
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/config"
 	"github.com/spikeekips/naru/digest"
-	storage "github.com/spikeekips/naru/newstorage"
 	"github.com/spikeekips/naru/sebak"
+	"github.com/spikeekips/naru/storage"
 )
 
 func getNodeInfo(endpoint *sebakcommon.Endpoint) (sebaknode.NodeInfo, error) {

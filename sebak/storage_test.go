@@ -10,7 +10,7 @@ import (
 	sebakerrors "boscoin.io/sebak/lib/errors"
 	sebakstorage "boscoin.io/sebak/lib/storage"
 
-	storage "github.com/spikeekips/naru/newstorage"
+	"github.com/spikeekips/naru/storage"
 )
 
 type FakeSEBAKStorageProvider struct {

@@ -11,9 +11,9 @@ import (
 	sebakrunner "boscoin.io/sebak/lib/node/runner"
 	sebakstorage "boscoin.io/sebak/lib/storage"
 
-	storage "github.com/spikeekips/naru/newstorage"
-	"github.com/spikeekips/naru/newstorage/item"
 	"github.com/spikeekips/naru/sebak"
+	"github.com/spikeekips/naru/storage"
+	"github.com/spikeekips/naru/storage/item"
 )
 
 var maxNumberOfWorkers int = 100

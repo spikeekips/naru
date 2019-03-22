@@ -9,7 +9,7 @@ import (
 	"github.com/spikeekips/cvc"
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/digest"
-	storage "github.com/spikeekips/naru/newstorage"
+	"github.com/spikeekips/naru/storage"
 
 	cmdcommon "boscoin.io/sebak/cmd/sebak/common"
 	"github.com/spikeekips/naru/config"

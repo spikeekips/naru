@@ -11,9 +11,9 @@ import (
 	sebaknode "boscoin.io/sebak/lib/node"
 
 	"github.com/spikeekips/naru/common"
-	storage "github.com/spikeekips/naru/newstorage"
-	"github.com/spikeekips/naru/newstorage/item"
 	"github.com/spikeekips/naru/sebak"
+	"github.com/spikeekips/naru/storage"
+	"github.com/spikeekips/naru/storage/item"
 )
 
 var farBlockHeight uint64 = 1000

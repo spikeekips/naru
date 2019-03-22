@@ -17,7 +17,7 @@ import (
 	"github.com/spikeekips/naru/api/rest"
 	resourcev1 "github.com/spikeekips/naru/api/rest/v1/resource"
 	"github.com/spikeekips/naru/common"
-	"github.com/spikeekips/naru/newstorage/item"
+	"github.com/spikeekips/naru/storage/item"
 )
 
 func (h *Handler) PostTransaction(w http.ResponseWriter, r *http.Request) {

@@ -12,8 +12,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/spikeekips/naru/common"
-	"github.com/spikeekips/naru/newstorage"
-	"github.com/spikeekips/naru/newstorage/item"
+	"github.com/spikeekips/naru/storage"
+	"github.com/spikeekips/naru/storage/item"
 )
 
 type testMongoData struct {
@@ -122,7 +122,7 @@ func (t *testMongoData) TestInsertTrnasaction() {
 	var block item.Block
 	{
 		var blk sebakblock.Block
-		err := newstorage.Deserialize(bblock, &blk)
+		err := storage.Deserialize(bblock, &blk)
 		t.NoError(err)
 		block = item.NewBlock(blk)
 	}
@@ -130,7 +130,7 @@ func (t *testMongoData) TestInsertTrnasaction() {
 	var itx item.Transaction
 	{
 		var tx sebaktransaction.Transaction
-		err := newstorage.Deserialize(btx, &tx)
+		err := storage.Deserialize(btx, &tx)
 		t.NoError(err)
 
 		itx = item.NewTransaction(tx, block, btx)

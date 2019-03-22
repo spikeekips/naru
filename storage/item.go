@@ -1,4 +1,4 @@
-package newstorage
+package storage
 
 type Record struct {
 	Key   string

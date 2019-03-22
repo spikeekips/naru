@@ -3,7 +3,7 @@ package sebak
 import (
 	sebakstorage "boscoin.io/sebak/lib/storage"
 
-	storage "github.com/spikeekips/naru/newstorage"
+	"github.com/spikeekips/naru/storage"
 )
 
 type Storage struct {

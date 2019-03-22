@@ -4,8 +4,8 @@ import (
 	sebaknode "boscoin.io/sebak/lib/node"
 
 	"github.com/spikeekips/naru/cache"
-	storage "github.com/spikeekips/naru/newstorage"
 	"github.com/spikeekips/naru/sebak"
+	"github.com/spikeekips/naru/storage"
 )
 
 type Handler struct {

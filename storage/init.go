@@ -1,4 +1,4 @@
-package newstorage
+package storage
 
 import (
 	logging "github.com/inconshreveable/log15"

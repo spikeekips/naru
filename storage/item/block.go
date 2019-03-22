@@ -7,8 +7,7 @@ import (
 	sebakerrors "boscoin.io/sebak/lib/errors"
 	sebakstorage "boscoin.io/sebak/lib/storage"
 
-	"github.com/spikeekips/naru/newstorage"
-	storage "github.com/spikeekips/naru/newstorage"
+	"github.com/spikeekips/naru/storage"
 )
 
 type Block struct {
@@ -66,7 +65,7 @@ func GetLastBlock(st storage.Storage) (Block, error) {
 
 	hash, ok := i.Value.(string)
 	if !ok {
-		return Block{}, newstorage.DecodeValueFailed.New()
+		return Block{}, storage.DecodeValueFailed.New()
 	}
 
 	return GetBlock(st, hash)

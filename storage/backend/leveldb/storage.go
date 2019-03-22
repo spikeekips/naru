@@ -9,7 +9,7 @@ import (
 	leveldbUtil "github.com/syndtr/goleveldb/leveldb/util"
 
 	"github.com/spikeekips/naru/config"
-	"github.com/spikeekips/naru/newstorage"
+	"github.com/spikeekips/naru/storage"
 )
 
 type Storage struct {
@@ -45,12 +45,12 @@ func (b *Storage) Close() error {
 	return b.l.Close()
 }
 
-func (b *Storage) Batch() newstorage.BatchStorage {
+func (b *Storage) Batch() storage.BatchStorage {
 	return NewBatch(b)
 }
 
 func (b *Storage) Write() error {
-	return newstorage.NotBatchStorage.New()
+	return storage.NotBatchStorage.New()
 }
 
 func (b *Storage) Has(k string) (bool, error) {
@@ -70,7 +70,7 @@ func (b *Storage) MustExist(k string) error {
 	if err != nil {
 		return err
 	} else if !exists {
-		return newstorage.NotFound.New()
+		return storage.NotFound.New()
 	}
 
 	return nil
@@ -81,7 +81,7 @@ func (b *Storage) MustNotExist(k string) error {
 	if err != nil {
 		return err
 	} else if exists {
-		return newstorage.AlreadyExists.New()
+		return storage.AlreadyExists.New()
 	}
 
 	return nil
@@ -97,10 +97,10 @@ func (b *Storage) Get(k string, v interface{}) error {
 		return setError(err)
 	}
 
-	return newstorage.Deserialize(o, v)
+	return storage.Deserialize(o, v)
 }
 
-func (b *Storage) Iterator(prefix string, v interface{}, options newstorage.ListOptions) (func() (newstorage.Record, bool), func()) {
+func (b *Storage) Iterator(prefix string, v interface{}, options storage.ListOptions) (func() (storage.Record, bool), func()) {
 	var reverse = false
 	var cursor []byte
 	var limit uint64 = 0
@@ -143,7 +143,7 @@ func (b *Storage) Iterator(prefix string, v interface{}, options newstorage.List
 	}
 
 	var n uint64 = 0
-	return func() (newstorage.Record, bool) {
+	return func() (storage.Record, bool) {
 			var exists bool
 			if n == 0 {
 				exists = seek()
@@ -152,8 +152,8 @@ func (b *Storage) Iterator(prefix string, v interface{}, options newstorage.List
 			}
 
 			nv := reflect.New(reflect.TypeOf(v)).Interface()
-			if err := newstorage.Deserialize(iter.Value(), nv); err != nil {
-				return newstorage.Record{}, false
+			if err := storage.Deserialize(iter.Value(), nv); err != nil {
+				return storage.Record{}, false
 			}
 
 			n++
@@ -162,7 +162,7 @@ func (b *Storage) Iterator(prefix string, v interface{}, options newstorage.List
 				exists = false
 			}
 
-			return newstorage.NewRecord(
+			return storage.NewRecord(
 				string(iter.Key()),
 				reflect.ValueOf(nv).Elem().Interface(),
 			), exists
@@ -177,7 +177,7 @@ func (b *Storage) Insert(k string, v interface{}) error {
 		return err
 	}
 
-	encoded, err := newstorage.Serialize(v)
+	encoded, err := storage.Serialize(v)
 	if err != nil {
 		return setError(err)
 	}
@@ -190,7 +190,7 @@ func (b *Storage) Update(k string, v interface{}) error {
 		return err
 	}
 
-	encoded, err := newstorage.Serialize(v)
+	encoded, err := storage.Serialize(v)
 	if err != nil {
 		return setError(err)
 	}
@@ -206,7 +206,7 @@ func (b *Storage) Delete(k string) error {
 	return setError(b.l.Delete(makeKey(k), nil))
 }
 
-func (b *Storage) MultipleInsert(items ...newstorage.Value) error {
+func (b *Storage) MultipleInsert(items ...storage.Value) error {
 	if len(items) < 1 {
 		return setError(errors.New("empty values"))
 	}
@@ -219,7 +219,7 @@ func (b *Storage) MultipleInsert(items ...newstorage.Value) error {
 
 	batch := new(leveldb.Batch)
 	for _, i := range items {
-		encoded, err := newstorage.Serialize(i.Value)
+		encoded, err := storage.Serialize(i.Value)
 		if err != nil {
 			return setError(err)
 		}
@@ -230,7 +230,7 @@ func (b *Storage) MultipleInsert(items ...newstorage.Value) error {
 	return setError(b.l.Write(batch, nil))
 }
 
-func (b *Storage) MultipleUpdate(items ...newstorage.Value) error {
+func (b *Storage) MultipleUpdate(items ...storage.Value) error {
 	if len(items) < 1 {
 		return setError(errors.New("empty values"))
 	}
@@ -243,7 +243,7 @@ func (b *Storage) MultipleUpdate(items ...newstorage.Value) error {
 
 	batch := new(leveldb.Batch)
 	for _, i := range items {
-		encoded, err := newstorage.Serialize(i.Value)
+		encoded, err := storage.Serialize(i.Value)
 		if err != nil {
 			return setError(err)
 		}
@@ -274,8 +274,7 @@ func (b *Storage) MultipleDelete(keys ...string) error {
 }
 
 func (b *Storage) Event(event string, values ...interface{}) {
-	newstorage.Observer.Trigger(event, values...)
-	return
+	storage.Observer.Trigger(event, values...)
 }
 
 func setError(err error) error {

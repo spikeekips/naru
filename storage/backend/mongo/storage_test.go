@@ -14,8 +14,8 @@ import (
 
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/config"
-	"github.com/spikeekips/naru/newstorage"
-	"github.com/spikeekips/naru/newstorage/item"
+	"github.com/spikeekips/naru/storage"
+	"github.com/spikeekips/naru/storage/item"
 )
 
 type baseTestMongoStorage struct {
@@ -115,9 +115,9 @@ func (t *testMongoStorage) TestInsert() {
 		}
 	}
 
-	iter, cls := t.s.Iterator("\x00\x10-", testMongoStorageItem{}, newstorage.NewDefaultListOptions(false, nil, 0))
+	iter, cls := t.s.Iterator("\x00\x10-", testMongoStorageItem{}, storage.NewDefaultListOptions(false, nil, 0))
 
-	var records []newstorage.Record
+	var records []storage.Record
 	for {
 		record, next := iter()
 		if !next {
@@ -283,10 +283,10 @@ func (t *testMongoStorage) TestIteratorLimit() {
 
 	{ // reverse=false, no cursor, 3 limited
 		limit := 3
-		opt := newstorage.NewDefaultListOptions(false, nil, uint64(limit))
+		opt := storage.NewDefaultListOptions(false, nil, uint64(limit))
 		iter, cls := t.s.Iterator(prefix, testMongoStorageItem{}, opt)
 
-		var records []newstorage.Record
+		var records []storage.Record
 		for {
 			record, next := iter()
 			if !next {
@@ -310,10 +310,10 @@ func (t *testMongoStorage) TestIteratorLimit() {
 
 	{ // reverse=true, no cursor, 3 limited
 		limit := 3
-		opt := newstorage.NewDefaultListOptions(true, nil, uint64(limit))
+		opt := storage.NewDefaultListOptions(true, nil, uint64(limit))
 		iter, cls := t.s.Iterator(prefix, testMongoStorageItem{}, opt)
 
-		var records []newstorage.Record
+		var records []storage.Record
 		for {
 			record, next := iter()
 			if !next {
@@ -338,10 +338,10 @@ func (t *testMongoStorage) TestIteratorLimit() {
 	{ // reverse=true, 4th cursor, 10 limited
 		cursorItem := items[4]
 		limit := 10
-		opt := newstorage.NewDefaultListOptions(true, []byte(cursorItem.A), uint64(limit))
+		opt := storage.NewDefaultListOptions(true, []byte(cursorItem.A), uint64(limit))
 		iter, cls := t.s.Iterator(prefix, testMongoStorageItem{}, opt)
 
-		var records []newstorage.Record
+		var records []storage.Record
 		for {
 			record, next := iter()
 			if !next {
@@ -394,10 +394,10 @@ func (t *testMongoStorage) TestIteratorCursor() {
 
 	{ // reverse=false, 3rd cursor, unlimited
 		cursorItem := items[2]
-		opt := newstorage.NewDefaultListOptions(false, []byte(cursorItem.A), 0)
+		opt := storage.NewDefaultListOptions(false, []byte(cursorItem.A), 0)
 		iter, cls := t.s.Iterator(prefix, testMongoStorageItem{}, opt)
 
-		var records []newstorage.Record
+		var records []storage.Record
 		for {
 			record, next := iter()
 			if !next {
@@ -421,10 +421,10 @@ func (t *testMongoStorage) TestIteratorCursor() {
 
 	{ // reverse=true, 3rd cursor, unlimited
 		cursorItem := items[2]
-		opt := newstorage.NewDefaultListOptions(true, []byte(cursorItem.A), 0)
+		opt := storage.NewDefaultListOptions(true, []byte(cursorItem.A), 0)
 		iter, cls := t.s.Iterator(prefix, testMongoStorageItem{}, opt)
 
-		var records []newstorage.Record
+		var records []storage.Record
 		for {
 			record, next := iter()
 			if !next {
@@ -476,10 +476,10 @@ func (t *testMongoStorage) TestIteratorOptions() {
 	}
 
 	{ // reverse=false, no cursor, unlimited
-		opt := newstorage.NewDefaultListOptions(false, nil, 0)
+		opt := storage.NewDefaultListOptions(false, nil, 0)
 		iter, cls := t.s.Iterator(prefix, testMongoStorageItem{}, opt)
 
-		var records []newstorage.Record
+		var records []storage.Record
 		for {
 			record, next := iter()
 			if !next {
@@ -502,10 +502,10 @@ func (t *testMongoStorage) TestIteratorOptions() {
 	}
 
 	{ // reverse=true, no cursor, unlimited
-		opt := newstorage.NewDefaultListOptions(true, nil, 0)
+		opt := storage.NewDefaultListOptions(true, nil, 0)
 		iter, cls := t.s.Iterator(prefix, testMongoStorageItem{}, opt)
 
-		var records []newstorage.Record
+		var records []storage.Record
 		for {
 			record, next := iter()
 			if !next {

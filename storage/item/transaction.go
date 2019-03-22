@@ -9,7 +9,7 @@ import (
 	sebaktransaction "boscoin.io/sebak/lib/transaction"
 	sebakoperation "boscoin.io/sebak/lib/transaction/operation"
 
-	storage "github.com/spikeekips/naru/newstorage"
+	"github.com/spikeekips/naru/storage"
 )
 
 type TransactionMessage struct {
