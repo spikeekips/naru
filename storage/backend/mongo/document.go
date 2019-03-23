@@ -45,99 +45,68 @@ const (
 )
 
 type Document struct {
-	K string      `bson:"_k"`
-	V interface{} `bson:"_v"`
+	K  string      `bson:"_k"`
+	V  interface{} `bson:"_v"`
+	rv bson.RawValue
 }
 
-func NewDocument(key string, value interface{}) (*Document, error) {
-	_, encoded, err := encodeValue(value)
+func NewDocument(key string, value interface{}) (Document, error) {
+	_, encoded, err := convertToDocumentValue(value)
 	if err != nil {
-		return nil, err
+		return Document{}, err
 	}
 
-	if _, err := Serialize(bson.M{"_v": encoded}); err != nil {
-		return nil, err
+	raw, err := Serialize(bson.M{"_v": encoded})
+	if err != nil {
+		return Document{}, err
 	}
 
-	return &Document{K: key, V: value}, nil
+	return Document{K: key, V: value, rv: bson.Raw(raw).Lookup("_v")}, nil
 }
 
-func (d *Document) Key() string {
+func (d Document) Key() string {
 	return d.K
 }
 
-func (d *Document) Value() interface{} {
+func (d Document) Value() interface{} {
 	return d.V
 }
 
-func (d *Document) BSONDocument() bson.M {
-	_, encoded, _ := encodeValue(d.V)
-	return bson.M{"_k": d.K, "_v": encoded}
+func (d Document) Decode(v interface{}) error {
+	return DecodeDocumentValue(d.rv, v)
 }
 
-func (d *Document) MarshalBSON() ([]byte, error) {
-	return Serialize(d.BSONDocument())
-}
-
-func UnmarshalDocument(b []byte, v interface{}) (*Document, error) {
-	key, fv, err := validateDocumentByRaw(b)
+func (d Document) MarshalBSON() ([]byte, error) {
+	bt, encoded, err := convertToDocumentValue(d.V)
 	if err != nil {
 		return nil, err
+	} else if bt == bsontype.Undefined && d.V != nil {
+		return nil, InvalidDocumentValue.New()
 	}
 
-	if err := decodeValue(fv, v); err != nil {
-		return nil, err
-	}
-
-	return &Document{K: key, V: reflect.ValueOf(v).Elem().Interface()}, nil
+	return Serialize(bson.M{"_k": d.K, "_v": encoded})
 }
 
-func UnmarshalDocumentValue(b []byte, v interface{}) (string, error) {
-	key, fv, err := validateDocumentByRaw(b)
-	if err != nil {
-		return "", err
+func (d *Document) UnmarshalBSON(b []byte) error {
+	var m bson.M
+	if err := Deserialize(b, &m); err != nil {
+		return err
 	}
 
-	if err := decodeValue(fv, v); err != nil {
-		return "", err
+	*d = Document{
+		K:  m["_k"].(string),
+		V:  m["_v"],
+		rv: bson.Raw(b).Lookup("_v"),
 	}
 
-	return key, nil
+	return nil
 }
 
-func validateDocumentByRaw(b []byte) (string, bson.RawValue, error) {
-	raw := bson.Raw(b)
-	if err := raw.Validate(); err != nil {
-		return "", bson.RawValue{}, err
-	}
-
-	var key string
-
-	fk, err := raw.LookupErr("_k")
-	if err != nil {
-		return "", bson.RawValue{}, err
-	} else if k, ok := fk.StringValueOK(); !ok {
-		return "", bson.RawValue{}, InvalidDocumentKey.New()
-	} else {
-		key = k
-	}
-
-	fv, err := raw.LookupErr("_v")
-	if err != nil {
-		return "", bson.RawValue{}, err
-	}
-
-	return key, fv, nil
+func (d Document) Equal(n Document) bool {
+	return d.K == n.K && reflect.DeepEqual(d.V, n.V)
 }
 
-type Value struct {
-	I  interface{}
-	M  interface{}
-	T  Hint
-	BT bsontype.Type
-}
-
-func encodeValue(v interface{}) (bsontype.Type, interface{}, error) {
+func convertToDocumentValue(v interface{}) (bsontype.Type, interface{}, error) {
 	var err error
 	var m interface{} = v
 	var bt bsontype.Type
@@ -180,7 +149,8 @@ func encodeValue(v interface{}) (bsontype.Type, interface{}, error) {
 	case Map:
 		bt = bsontype.EmbeddedDocument
 	case Ptr:
-		return encodeValue(reflect.ValueOf(v).Elem().Interface())
+		bt = bsontype.EmbeddedDocument
+		//return convertToDocumentValue(reflect.ValueOf(v).Elem().Interface())
 	case String:
 		bt = bsontype.String
 	case Struct:
@@ -204,15 +174,29 @@ func convertDecimal128ToUint(rv bson.RawValue, bitSize int) (interface{}, error)
 	if !ok {
 		return nil, errors.New("not primitive.Decimal128 type")
 	}
+
+	return decimal128ToUint(d, bitSize)
+}
+
+func decimal128ToUint(d primitive.Decimal128, bitSize int) (interface{}, error) {
 	return strconv.ParseUint(d.String(), 10, bitSize)
 }
 
-func decodeValue(rv bson.RawValue, f interface{}) error {
+func UnmarshalDocument(b []byte, v interface{}) (Document, error) {
+	var doc Document
+	if err := Deserialize(b, &doc); err != nil {
+		return Document{}, err
+	}
+
+	return doc, doc.Decode(v)
+}
+
+func DecodeDocumentValue(rv bson.RawValue, v interface{}) error {
 	var o interface{}
 
 	// TODO support mongo timestamp
 
-	switch Hint(reflect.TypeOf(f).Elem().Kind()) {
+	switch Hint(reflect.TypeOf(v).Elem().Kind()) {
 	case Uint:
 		if i, err := convertDecimal128ToUint(rv, 32); err != nil {
 			return err
@@ -244,10 +228,10 @@ func decodeValue(rv bson.RawValue, f interface{}) error {
 			o = i.(uint64)
 		}
 	default:
-		return rv.UnmarshalWithRegistry(DefaultBSONRegistry, f)
+		return rv.UnmarshalWithRegistry(DefaultBSONRegistry, v)
 	}
 
-	reflect.ValueOf(f).Elem().Set(reflect.ValueOf(o))
+	reflect.ValueOf(v).Elem().Set(reflect.ValueOf(o))
 
 	return nil
 }

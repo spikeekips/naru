@@ -62,7 +62,7 @@ func NewBSONRegistry() *bsoncodec.Registry {
 }
 
 func Serialize(i interface{}) ([]byte, error) {
-	return bson.MarshalWithRegistry(DefaultBSONRegistry, &i)
+	return bson.MarshalWithRegistry(DefaultBSONRegistry, i)
 }
 
 func Deserialize(b []byte, i interface{}) error {

@@ -47,11 +47,11 @@ func (t *testMongoData) TestInsertAmount() {
 	}
 
 	{
-		b, err := bson.Marshal(value)
+		b, err := Serialize(value)
 		t.NoError(err)
 
 		var n testMongoDataAmount
-		err = bson.Unmarshal(b, &n)
+		err = Deserialize(b, &n)
 		t.NoError(err)
 		t.Equal(value.A, n.A)
 		t.Equal(value.B, n.B)

@@ -528,6 +528,13 @@ func (t *testMongoStorage) TestIteratorOptions() {
 	}
 }
 
+func (t *testMongoStorage) TestInsertWithoutDocument() {
+	value := "findme"
+	r, err := t.s.Collection().InsertOne(context.Background(), value)
+	t.Error(err, "WriteString can only write")
+	t.Nil(r)
+}
+
 func TestMongoStorage(t *testing.T) {
 	if client, err := connect(); err != nil {
 		log.Warn("mongodb test will be skipped")

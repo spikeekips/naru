@@ -130,7 +130,7 @@ func (b *Storage) Get(k string, v interface{}) error {
 		return err
 	}
 
-	_, err = UnmarshalDocumentValue(raw, v)
+	_, err = UnmarshalDocument(raw, v)
 	return err
 }
 
@@ -176,12 +176,12 @@ func (b *Storage) Iterator(prefix string, v interface{}, opt storage.ListOptions
 			}
 
 			nv := reflect.New(reflect.TypeOf(v)).Interface()
-			key, err := UnmarshalDocumentValue([]byte(cur.Current), nv)
+			doc, err := UnmarshalDocument([]byte(cur.Current), nv)
 			if err != nil {
 				return storage.Record{}, false
 			}
 
-			return storage.NewRecord(key, reflect.ValueOf(nv).Elem().Interface()), true
+			return storage.NewRecord(doc.K, reflect.ValueOf(nv).Elem().Interface()), true
 		}, func() {
 			if err != nil {
 				return

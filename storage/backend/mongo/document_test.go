@@ -44,6 +44,42 @@ func (t *testMongoDocument) TestMarshal() {
 	}
 }
 
+func (t *testMongoDocument) TestMarshalWithBSONMarshaller() {
+	defer func() {
+		if r := recover(); r != nil {
+			debug.PrintStack()
+			panic(r)
+		}
+	}()
+
+	key := "showme"
+	value := map[string]uint64{
+		"1": 1,
+		"2": 2,
+	}
+
+	_, err := Serialize(value)
+	t.NoError(err)
+
+	origDoc, err := NewDocument(key, value)
+	t.NoError(err)
+
+	b, err := Serialize(origDoc)
+	t.NoError(err)
+	t.NotEmpty(b)
+
+	var doc *Document
+	err = Deserialize(b, &doc)
+	t.NoError(err)
+
+	t.Equal(origDoc.K, doc.K)
+	t.NotEqual(origDoc.V, doc.V)
+
+	var valueMap map[string]uint64
+	err = doc.Decode(&valueMap)
+	t.NoError(err)
+}
+
 func (t *testMongoDocument) TestUnmarshal() {
 	key := "showme"
 	value := map[string]int{
@@ -55,7 +91,7 @@ func (t *testMongoDocument) TestUnmarshal() {
 	t.NoError(err)
 
 	{
-		b, err := bson.Marshal(doc)
+		b, err := Serialize(doc)
 		t.NoError(err)
 		t.NotEmpty(b)
 
@@ -68,10 +104,9 @@ func (t *testMongoDocument) TestUnmarshal() {
 		unmarshaledDoc, err := UnmarshalDocument(b, &returned)
 		t.NoError(err)
 		t.Equal(key, unmarshaledDoc.Key())
-		t.Equal(value, unmarshaledDoc.Value())
 		t.Equal(value, returned)
 
-		for k, v := range unmarshaledDoc.Value().(map[string]int) {
+		for k, v := range returned {
 			t.Equal(value[k], v)
 		}
 		for k, v := range value {
@@ -98,7 +133,7 @@ func (t *testMongoDocument) TestUnmarshalStruct() {
 	t.NoError(err)
 
 	{
-		b, err := bson.Marshal(doc)
+		b, err := Serialize(doc)
 		t.NoError(err)
 		t.NotEmpty(b)
 
@@ -112,7 +147,6 @@ func (t *testMongoDocument) TestUnmarshalStruct() {
 			unmarshaledDoc, err := UnmarshalDocument(b, &returned)
 			t.NoError(err)
 			t.Equal(key, unmarshaledDoc.Key())
-			t.Equal(value, unmarshaledDoc.Value())
 			t.Equal(value, returned)
 
 			t.Equal(value.A, returned.A)
@@ -144,6 +178,7 @@ func (t *testMongoValue) TestEncodeDecodeValue() {
 		t     Hint
 		m     bsontype.Type
 		msg   string
+		check func(interface{})
 	}{
 		{
 			input: true,
@@ -275,16 +310,32 @@ func (t *testMongoValue) TestEncodeDecodeValue() {
 			msg:   "make(chan bool)",
 		},
 		{
-			input: &Value{},
+			input: Document{},
+			err:   nil,
+			t:     Struct,
+			m:     bsontype.EmbeddedDocument,
+			msg:   "Document{}",
+			check: func(e interface{}) {
+				d := Document{}
+				t.True(d.Equal(e.(Document)))
+			},
+		},
+		{
+			input: &Document{},
 			err:   nil,
 			t:     Ptr,
 			m:     bsontype.EmbeddedDocument,
-			msg:   "&Value{}",
+			msg:   "&Document{}",
+			check: func(e interface{}) {
+				d := &Document{}
+				u := e.(*Document)
+				t.True(d.Equal(*u))
+			},
 		},
 	}
 
 	for n, c := range cases {
-		bt, encoded, err := encodeValue(c.input)
+		bt, encoded, err := convertToDocumentValue(c.input)
 		if c.err == nil {
 			t.NoError(err, c.msg)
 		} else {
@@ -297,19 +348,22 @@ func (t *testMongoValue) TestEncodeDecodeValue() {
 			continue
 		}
 
-		b, err := bson.Marshal(bson.M{"a": "showme", "b": encoded})
+		b, err := Serialize(bson.M{"a": "showme", "b": encoded})
 		t.NoError(err, "%s: %d", c.msg, n)
 
 		raw := bson.Raw(b)
 		rv := raw.Lookup("b")
 
 		f := reflect.New(reflect.TypeOf(c.input)).Interface()
-		err = decodeValue(rv, f)
+		err = DecodeDocumentValue(rv, f)
 		t.NoError(err, "%s: %d", c.msg, n)
 
 		e := reflect.ValueOf(f).Elem().Interface()
-		t.Equal(c.input, e, c.msg, strconv.Itoa(n))
 		t.Equal(c.t, Hint(reflect.TypeOf(e).Kind()), "%s: %d", c.msg, n)
+
+		if c.check != nil {
+			c.check(e)
+		}
 	}
 }
 
@@ -319,7 +373,7 @@ func (t *testMongoValue) TestMarshalStruct() {
 		B []int  `bson:"b"`
 	}{A: "showme", B: []int{1, 2}}
 
-	b, err := bson.Marshal(input)
+	b, err := Serialize(input)
 	t.NoError(err)
 
 	{
@@ -349,38 +403,6 @@ func (t *testMongoValue) TestMarshalStruct() {
 		t.Equal(reflect.Slice, reflect.TypeOf(f).Kind())
 	}
 }
-
-/*
-
-func (a Amount) MarshalBSONValue() (bsontype.Type, []byte, error) {
-	n, err := primitive.ParseDecimal128(a.String())
-	if err != nil {
-		return bsontype.Decimal128, nil, err
-	}
-
-	return bsontype.Decimal128, bsoncore.AppendDecimal128(nil, n), nil
-}
-
-func (a *Amount) UnmarshalBSON(b []byte) error {
-	val := bson.RawValue{
-		Type:  bsontype.Decimal128,
-		Value: b,
-	}
-	var d primitive.Decimal128
-	if err := val.Unmarshal(&d); err != nil {
-		return err
-	}
-
-	c, err := strconv.ParseUint(d.String(), 10, 64)
-	if err != nil {
-		return err
-	}
-
-	*a = Amount(c)
-
-	return nil
-}
-*/
 
 func (t *testMongoValue) TestEncodeDecodeSEBAKAmount() {
 	{ // with using bson default registry
