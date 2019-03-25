@@ -16,7 +16,7 @@ import (
 type Batch struct {
 	sync.RWMutex
 	s      *Storage
-	ops    []mongo.WriteModel
+	ops    map[string][]mongo.WriteModel
 	events []common.EventItem
 	log    logging.Logger
 }
@@ -25,6 +25,7 @@ func NewBatch(s *Storage) *Batch {
 	return &Batch{
 		s:   s,
 		log: log.New(logging.Ctx{"name": "batch"}),
+		ops: map[string][]mongo.WriteModel{},
 	}
 }
 
@@ -61,28 +62,32 @@ func (b *Batch) Write() error {
 		storage.Observer.Trigger(strings.Join(es, " "), e.Items...)
 	}
 
-	var ops []mongo.WriteModel
-	{
-		b.RLock()
-		ops = make([]mongo.WriteModel, len(b.ops))
-		copy(ops, b.ops)
-		b.RUnlock()
+	b.RLock()
+	ops := map[string][]mongo.WriteModel{}
+	for k, v := range b.ops {
+		ops[k] = make([]mongo.WriteModel, len(v))
+		copy(ops[k], v)
 	}
+	b.RUnlock()
 
-	result, err := b.s.Collection().BulkWrite(context.Background(), ops)
-	if err != nil {
-		return err
+	for k, v := range ops {
+		col := b.s.Database().Collection(k)
+		result, err := col.BulkWrite(context.Background(), v)
+		if err != nil {
+			return err
+		}
+
+		b.log.Debug(
+			"write",
+			"collection", k,
+			"inserted", result.InsertedCount,
+			"matched", result.MatchedCount,
+			"modified", result.ModifiedCount,
+			"deleted", result.DeletedCount,
+			"upserted", result.UpsertedCount,
+			"object-ids", result.UpsertedIDs,
+		)
 	}
-
-	b.log.Debug(
-		"write",
-		"inserted", result.InsertedCount,
-		"matched", result.MatchedCount,
-		"modified", result.ModifiedCount,
-		"deleted", result.DeletedCount,
-		"upserted", result.UpsertedCount,
-		"object-ids", result.UpsertedIDs,
-	)
 
 	for _, e := range events { // only non-OnAfterSave event will be triggered
 		var events []string
@@ -102,7 +107,10 @@ func (b *Batch) Write() error {
 
 func (b *Batch) Cancel() error {
 	defer b.clearEvents()
-	b.ops = nil
+
+	b.Lock()
+	b.ops = map[string][]mongo.WriteModel{}
+	b.Unlock()
 
 	return nil
 }
@@ -139,12 +147,21 @@ func (b *Batch) insert(k string, v interface{}) error {
 	b.Lock()
 	defer b.Unlock()
 
+	c, err := getCollection(k)
+	if err != nil {
+		return err
+	}
+
+	if _, ok := b.ops[c]; !ok {
+		b.ops[c] = []mongo.WriteModel{}
+	}
+
 	doc, err := NewDocument(k, v)
 	if err != nil {
 		return err
 	}
 
-	b.ops = append(b.ops, mongo.NewInsertOneModel().SetDocument(doc))
+	b.ops[c] = append(b.ops[c], mongo.NewInsertOneModel().SetDocument(doc))
 
 	return nil
 }
@@ -175,7 +192,16 @@ func (b *Batch) delete(k string) error {
 	b.Lock()
 	defer b.Unlock()
 
-	b.ops = append(b.ops, mongo.NewDeleteOneModel().SetFilter(bson.M{KEY: k}))
+	c, err := getCollection(k)
+	if err != nil {
+		return err
+	}
+
+	if _, ok := b.ops[c]; !ok {
+		b.ops[c] = []mongo.WriteModel{}
+	}
+
+	b.ops[c] = append(b.ops[c], mongo.NewDeleteOneModel().SetFilter(bson.M{KEY: k}))
 	log.Debug("delete doc", "key", k)
 
 	return nil

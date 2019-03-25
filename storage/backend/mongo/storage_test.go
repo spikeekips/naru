@@ -106,7 +106,7 @@ func (t *testMongoStorage) TestInsert() {
 	{ // other records
 		for i := uint64(0); i < 3; i++ {
 			item := testMongoStorageItem{
-				A: "BBB-" + common.SequentialUUID(),
+				A: "0020BBB-" + common.SequentialUUID(),
 				B: int(i),
 				C: []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
 			}
@@ -146,7 +146,7 @@ func (t *testMongoStorage) TestInsertBatch() {
 	var items []testMongoStorageItem
 	for i := uint64(0); i < 5; i++ {
 		item := testMongoStorageItem{
-			A: "AAA-" + common.RandomUUID(),
+			A: item.InternalPrefix[:2] + "AAA-" + common.RandomUUID(),
 			B: int(i),
 			C: []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
 		}
@@ -174,10 +174,17 @@ func (t *testMongoStorage) TestInsertBatch() {
 }
 
 func (t *testMongoStorage) TestUpdateBatch() {
+	defer func() {
+		if r := recover(); r != nil {
+			debug.PrintStack()
+			panic(r)
+		}
+	}()
+
 	var items []testMongoStorageItem
 	for i := uint64(0); i < 5; i++ {
 		item := testMongoStorageItem{
-			A:    "AAA-" + common.RandomUUID(),
+			A:    item.InternalPrefix[:2] + "AAA-" + common.RandomUUID(),
 			B:    int(i),
 			BOld: int(i),
 			C:    []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
@@ -219,7 +226,7 @@ func (t *testMongoStorage) TestDeleteBatch() {
 	var items []testMongoStorageItem
 	for i := uint64(0); i < 5; i++ {
 		item := testMongoStorageItem{
-			A:    "AAA-" + common.RandomUUID(),
+			A:    item.InternalPrefix[:2] + "AAA-" + common.RandomUUID(),
 			B:    int(i),
 			BOld: int(i),
 			C:    []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
@@ -272,7 +279,7 @@ func (t *testMongoStorage) TestIteratorLimit() {
 	{ // other records
 		for i := uint64(0); i < 3; i++ {
 			item := testMongoStorageItem{
-				A: "BBB-" + common.SequentialUUID(),
+				A: "0020BBB-" + common.SequentialUUID(),
 				B: int(i),
 				C: []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
 			}
@@ -383,7 +390,7 @@ func (t *testMongoStorage) TestIteratorCursor() {
 	{ // other records
 		for i := uint64(0); i < 3; i++ {
 			item := testMongoStorageItem{
-				A: "BBB-" + common.SequentialUUID(),
+				A: "0020BBB-" + common.SequentialUUID(),
 				B: int(i),
 				C: []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
 			}
@@ -466,7 +473,7 @@ func (t *testMongoStorage) TestIteratorOptions() {
 	{ // other records
 		for i := uint64(0); i < 3; i++ {
 			item := testMongoStorageItem{
-				A: "BBB-" + common.SequentialUUID(),
+				A: "0020BBB-" + common.SequentialUUID(),
 				B: int(i),
 				C: []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
 			}
@@ -530,7 +537,8 @@ func (t *testMongoStorage) TestIteratorOptions() {
 
 func (t *testMongoStorage) TestInsertWithoutDocument() {
 	value := "findme"
-	r, err := t.s.Collection().InsertOne(context.Background(), value)
+	col, _ := t.s.Collection(item.InternalPrefix[:2])
+	r, err := col.InsertOne(context.Background(), value)
 	t.Error(err, "WriteString can only write")
 	t.Nil(r)
 }

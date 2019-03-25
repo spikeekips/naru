@@ -62,8 +62,17 @@ func (b *Storage) connect() error {
 	return nil
 }
 
-func (b *Storage) Collection() *mongo.Collection {
-	return b.c.Database(b.databaseName).Collection(b.collectionName)
+func (b *Storage) Database() *mongo.Database {
+	return b.c.Database(b.databaseName)
+}
+
+func (b *Storage) Collection(key string) (*mongo.Collection, error) {
+	c, err := getCollection(key)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.Database().Collection(c), nil
 }
 
 func (b *Storage) Core() *mongo.Client {
@@ -80,7 +89,13 @@ func (b *Storage) Batch() storage.BatchStorage {
 
 func (b *Storage) Has(k string) (bool, error) {
 	q := bson.M{KEY: k}
-	cur, err := b.Collection().Find(
+
+	col, err := b.Collection(k)
+	if err != nil {
+		return false, err
+	}
+
+	cur, err := col.Find(
 		context.Background(),
 		q,
 		options.Find().SetProjection(bson.M{"_id": 1}).SetLimit(1),
@@ -119,7 +134,12 @@ func (b *Storage) Get(k string, v interface{}) error {
 		return err
 	}
 
-	r := b.Collection().FindOne(context.Background(), bson.M{KEY: k})
+	col, err := b.Collection(k)
+	if err != nil {
+		return err
+	}
+
+	r := col.FindOne(context.Background(), bson.M{KEY: k})
 	if err := r.Err(); err != nil {
 		return err
 	}
@@ -161,8 +181,12 @@ func (b *Storage) Iterator(prefix string, v interface{}, opt storage.ListOptions
 		SetLimit(int64(opt.Limit())).
 		SetSort(bson.M{KEY: reverse})
 
-	cur, err := b.Collection().Find(context.Background(), q, mopt)
+	col, err := b.Collection(prefix)
+	if err != nil {
+		return nil, nil
+	}
 
+	cur, err := col.Find(context.Background(), q, mopt)
 	return func() (storage.Record, bool) {
 			// TODO err should be returned
 			if err != nil {
@@ -199,7 +223,12 @@ func (b *Storage) Insert(k string, v interface{}) error {
 	if err != nil {
 		return err
 	}
-	_, err = b.Collection().InsertOne(context.Background(), doc)
+	col, err := b.Collection(k)
+	if err != nil {
+		return err
+	}
+
+	_, err = col.InsertOne(context.Background(), doc)
 	return err
 }
 
@@ -222,7 +251,12 @@ func (b *Storage) Delete(k string) error {
 		return err
 	}
 
-	_, err := b.Collection().DeleteOne(context.Background(), bson.M{KEY: k}, nil)
+	col, err := b.Collection(k)
+	if err != nil {
+		return err
+	}
+
+	_, err = col.DeleteOne(context.Background(), bson.M{KEY: k}, nil)
 	return err
 }
 

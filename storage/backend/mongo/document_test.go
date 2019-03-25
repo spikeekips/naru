@@ -10,6 +10,7 @@ import (
 
 	sebakcommon "boscoin.io/sebak/lib/common"
 	"github.com/spikeekips/naru/common"
+	"github.com/spikeekips/naru/storage/item"
 	"github.com/stretchr/testify/suite"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsoncodec"
@@ -538,7 +539,7 @@ type testMongoDocumentStore struct {
 }
 
 func (t *testMongoDocumentStore) TestFindMap() {
-	key := "showme"
+	key := item.InternalPrefix[:2] + "showme"
 	value := map[string]uint64{
 		"a1": 1,
 		"a2": 2,
@@ -553,7 +554,8 @@ func (t *testMongoDocumentStore) TestFindMap() {
 		t.NoError(err)
 	}
 
-	cur, err := t.s.Collection().Find(context.Background(), bson.M{DocField("a1"): 1})
+	col, _ := t.s.Collection(key)
+	cur, err := col.Find(context.Background(), bson.M{DocField("a1"): 1})
 	t.NoError(err)
 
 	var records []map[string]uint64
@@ -582,7 +584,7 @@ func (t *testMongoDocumentStore) TestFindStruct() {
 		}
 	}()
 
-	key := "showme"
+	key := item.InternalPrefix[:2] + "showme"
 	value := testUnmarshalStruct{
 		A: "AAA",
 		B: 99,
@@ -593,7 +595,7 @@ func (t *testMongoDocumentStore) TestFindStruct() {
 	t.NoError(err)
 
 	for i := 0; i < 5; i++ {
-		key := common.RandomUUID()
+		key := item.InternalPrefix[:2] + common.RandomUUID()
 		value := testUnmarshalStruct{
 			A: common.RandomUUID(),
 			B: 199,
@@ -618,7 +620,8 @@ func (t *testMongoDocumentStore) TestFindStruct() {
 	}
 
 	{
-		cur, err := t.s.Collection().Find(context.Background(), bson.M{"_v.a": "AAA"})
+		col, _ := t.s.Collection(key)
+		cur, err := col.Find(context.Background(), bson.M{"_v.a": "AAA"})
 		t.NoError(err)
 
 		var records []testUnmarshalStruct
@@ -636,7 +639,8 @@ func (t *testMongoDocumentStore) TestFindStruct() {
 	}
 
 	{
-		cur, err := t.s.Collection().Find(context.Background(), bson.M{"_v.b": 99})
+		col, _ := t.s.Collection(key)
+		cur, err := col.Find(context.Background(), bson.M{"_v.b": 99})
 		t.NoError(err)
 
 		var records []testUnmarshalStruct
@@ -654,7 +658,8 @@ func (t *testMongoDocumentStore) TestFindStruct() {
 	}
 
 	{
-		cur, err := t.s.Collection().Find(
+		col, _ := t.s.Collection(key)
+		cur, err := col.Find(
 			context.Background(),
 			bson.M{"_v.a": "AAA", "_v.c": bson.M{"$in": bson.A{7}}},
 		)

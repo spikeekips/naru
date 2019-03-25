@@ -57,7 +57,7 @@ func (t *testMongoData) TestInsertAmount() {
 		t.Equal(value.B, n.B)
 	}
 
-	err := t.s.Insert(common.RandomUUID(), value)
+	err := t.s.Insert(item.InternalPrefix[:2]+common.RandomUUID(), value)
 	t.NoError(err)
 }
 
