@@ -2,13 +2,31 @@ package mongostorage
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+type FIELD string
+
+const (
+	KEY FIELD = "_k"
+	DOC FIELD = "_v"
+)
+
+func (f FIELD) Field(fs ...string) string {
+	if f == KEY {
+		log.Crit("KEY does not have sub fields")
+		return ""
+	}
+
+	return fmt.Sprintf("%s.%s", DOC, strings.Join(fs, "."))
+}
 
 type Hint reflect.Kind
 
@@ -56,12 +74,12 @@ func NewDocument(key string, value interface{}) (Document, error) {
 		return Document{}, err
 	}
 
-	raw, err := Serialize(bson.M{"_v": encoded})
+	raw, err := Serialize(bson.M{DOC: encoded})
 	if err != nil {
 		return Document{}, err
 	}
 
-	return Document{K: key, V: value, rv: bson.Raw(raw).Lookup("_v")}, nil
+	return Document{K: key, V: value, rv: bson.Raw(raw).Lookup(DOC)}, nil
 }
 
 func (d Document) Key() string {
@@ -84,7 +102,7 @@ func (d Document) MarshalBSON() ([]byte, error) {
 		return nil, InvalidDocumentValue.New()
 	}
 
-	return Serialize(bson.M{"_k": d.K, "_v": encoded})
+	return Serialize(bson.M{KEY: d.K, DOC: encoded})
 }
 
 func (d *Document) UnmarshalBSON(b []byte) error {
@@ -94,9 +112,9 @@ func (d *Document) UnmarshalBSON(b []byte) error {
 	}
 
 	*d = Document{
-		K:  m["_k"].(string),
-		V:  m["_v"],
-		rv: bson.Raw(b).Lookup("_v"),
+		K:  m[KEY].(string),
+		V:  m[DOC],
+		rv: bson.Raw(b).Lookup(DOC),
 	}
 
 	return nil
