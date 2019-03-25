@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/spikeekips/naru/storage"
 	leveldbstorage "github.com/spikeekips/naru/storage/backend/leveldb"
 	mongostorage "github.com/spikeekips/naru/storage/backend/mongo"
+	"github.com/spikeekips/naru/storage/item"
 	leveldbitem "github.com/spikeekips/naru/storage/item/leveldb"
 	mongoitem "github.com/spikeekips/naru/storage/item/mongo"
 )
@@ -81,4 +83,17 @@ func NewStorageByConfig(c *config.Storage) (storage.Storage, error) {
 	}
 
 	return st, nil
+}
+
+func NewGetterByStorage(st storage.Storage) item.Getter {
+	switch st.(type) {
+	case *mongostorage.Storage:
+		return mongoitem.NewGetter(st.(*mongostorage.Storage))
+	case *leveldbstorage.Storage:
+		return leveldbitem.NewGetter(st.(*leveldbstorage.Storage))
+	default:
+		panic(errors.New("invalid storage type found"))
+	}
+
+	return nil
 }

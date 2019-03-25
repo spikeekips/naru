@@ -10,7 +10,6 @@ import (
 	sebakresource "boscoin.io/sebak/lib/node/runner/api/resource"
 
 	"github.com/spikeekips/naru/api/rest"
-	"github.com/spikeekips/naru/storage/item"
 )
 
 var (
@@ -23,7 +22,7 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 
 	jw := rest.NewJSONWriter(w, r)
 
-	ac, err := item.GetAccount(h.st, address)
+	ac, err := h.getter.Account(address)
 	if err != nil {
 		jw.WriteObject(err)
 		return
@@ -58,7 +57,7 @@ func (h *Handler) GetAccounts(w http.ResponseWriter, r *http.Request) {
 
 	var rs []sebakresource.Resource
 	for _, address := range addresses {
-		ac, err := item.GetAccount(h.st, address)
+		ac, err := h.getter.Account(address)
 		if err != nil {
 			jw.WriteObject(err)
 			return

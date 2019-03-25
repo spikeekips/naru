@@ -12,7 +12,6 @@ import (
 
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/sebak"
-	"github.com/spikeekips/naru/storage"
 	"github.com/spikeekips/naru/storage/item"
 )
 
@@ -20,8 +19,8 @@ var farBlockHeight uint64 = 1000
 
 type BaseDigestRunner struct {
 	sync.RWMutex
-	st                  storage.Storage
 	sst                 *sebak.Storage
+	getter              item.Getter
 	sebakInfo           sebaknode.NodeInfo
 	storedRemoteBlock   sebakblock.Block
 	lastLocalBlock      item.Block
@@ -66,11 +65,11 @@ type InitializeDigestRunner struct {
 	initialize bool
 }
 
-func NewInitializeDigestRunner(st storage.Storage, sst *sebak.Storage, sebakInfo sebaknode.NodeInfo) *InitializeDigestRunner {
+func NewInitializeDigestRunner(sst *sebak.Storage, getter item.Getter, sebakInfo sebaknode.NodeInfo) *InitializeDigestRunner {
 	return &InitializeDigestRunner{
 		BaseDigestRunner: &BaseDigestRunner{
-			st:        st,
 			sst:       sst,
+			getter:    getter,
 			sebakInfo: sebakInfo,
 		},
 	}
@@ -111,7 +110,7 @@ func (d *InitializeDigestRunner) Run() (err error) {
 
 	{ // get last local block
 		var block item.Block
-		block, err = item.GetLastBlock(d.st)
+		block, err = d.getter.LastBlock()
 		if err != nil {
 			if e, ok := err.(*sebakerrors.Error); ok {
 				if e.Code != sebakerrors.StorageRecordDoesNotExist.Code {
@@ -144,7 +143,7 @@ func (d *InitializeDigestRunner) Run() (err error) {
 	}
 
 	var dg *Digest
-	dg, err = NewDigest(d.st, d.sst, d.GenesisSource(), d.LastLocalBlock().Height, lastRemoteBlock.Height, d.initialize)
+	dg, err = NewDigest(d.sst, d.getter, d.GenesisSource(), d.LastLocalBlock().Height, lastRemoteBlock.Height, d.initialize)
 	if err != nil {
 		log.Error("failed to open digest", "error", err)
 		return
@@ -171,11 +170,11 @@ type WatchDigestRunner struct {
 	interval time.Duration
 }
 
-func NewWatchDigestRunner(st storage.Storage, sst *sebak.Storage, sebakInfo sebaknode.NodeInfo, start uint64) *WatchDigestRunner {
+func NewWatchDigestRunner(sst *sebak.Storage, getter item.Getter, sebakInfo sebaknode.NodeInfo, start uint64) *WatchDigestRunner {
 	return &WatchDigestRunner{
 		BaseDigestRunner: &BaseDigestRunner{
-			st:        st,
 			sst:       sst,
+			getter:    getter,
 			sebakInfo: sebakInfo,
 		},
 		start: start,
@@ -231,7 +230,7 @@ func (w *WatchDigestRunner) Run(force bool) error {
 	sst.Provider().Close()
 
 	{ // get last local block
-		block, err := item.GetLastBlock(w.st)
+		block, err := w.getter.LastBlock()
 		if err != nil {
 			log.Error("failed to get last local block", "error", err)
 			return err
@@ -265,7 +264,7 @@ func (w *WatchDigestRunner) Run(force bool) error {
 func (w *WatchDigestRunner) followup(start, end uint64) error {
 	log.Debug("start to follow up", "start", start, "end", end)
 
-	dg, err := NewDigest(w.st, w.sst, w.GenesisSource(), start, end, false)
+	dg, err := NewDigest(w.sst, w.getter, w.GenesisSource(), start, end, false)
 	if err != nil {
 		log.Error("failed to open digest", "error", err)
 		return err
@@ -327,7 +326,7 @@ func (w *WatchDigestRunner) watchLatestBlock(lastBlock uint64) error {
 		start = lastBlock
 	}
 
-	db, err := NewDigest(w.st, w.sst, w.GenesisSource(), start, block.Height, false)
+	db, err := NewDigest(w.sst, w.getter, w.GenesisSource(), start, block.Height, false)
 	if err != nil {
 		log.Error("failed to open digest", "error", err)
 		return err

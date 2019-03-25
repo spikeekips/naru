@@ -94,36 +94,3 @@ func (o Operation) Save(st storage.Storage) error {
 
 	return nil
 }
-
-func GetOperation(st storage.Storage, hash string) (op Operation, err error) {
-	err = st.Get(GetOperationKey(hash), &op)
-	return
-}
-
-func GetOperationsByAccount(st storage.Storage, address string, options storage.ListOptions) (
-	func() (Operation, bool, []byte),
-	func(),
-) {
-	iterFunc, closeFunc := st.Iterator(fmt.Sprintf("%s%s", OperationAccountRelatedPrefix, address), "", options)
-
-	return (func() (Operation, bool, []byte) {
-			item, hasNext := iterFunc()
-			if !hasNext {
-				return Operation{}, false, []byte(item.Key)
-			}
-
-			hash, ok := item.Value.(string)
-			if !ok {
-				return Operation{}, false, []byte(item.Key)
-			}
-
-			o, err := GetOperation(st, hash)
-			if err != nil {
-				return Operation{}, false, []byte(item.Key)
-			}
-
-			return o, hasNext, []byte(item.Key)
-		}), (func() {
-			closeFunc()
-		})
-}

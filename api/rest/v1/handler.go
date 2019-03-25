@@ -5,16 +5,16 @@ import (
 
 	"github.com/spikeekips/naru/cache"
 	"github.com/spikeekips/naru/sebak"
-	"github.com/spikeekips/naru/storage"
+	"github.com/spikeekips/naru/storage/item"
 )
 
 type Handler struct {
-	st        storage.Storage
 	sst       *sebak.Storage
+	getter    item.Getter
 	cch       *cache.Cache
 	sebakInfo sebaknode.NodeInfo
 }
 
-func NewHandler(st storage.Storage, sst *sebak.Storage, cch *cache.Cache, sebakInfo sebaknode.NodeInfo) *Handler {
-	return &Handler{st: st, sst: sst, cch: cch, sebakInfo: sebakInfo}
+func NewHandler(sst *sebak.Storage, getter item.Getter, cch *cache.Cache, sebakInfo sebaknode.NodeInfo) *Handler {
+	return &Handler{sst: sst, getter: getter, cch: cch, sebakInfo: sebakInfo}
 }

@@ -20,7 +20,7 @@ func (g OperationsByAccountStreamHandler) NewRequest(base BaseStreamHandler) (St
 	vars := mux.Vars(base.Request())
 	address := vars["id"]
 
-	if _, err := item.GetAccount(g.H.st, address); err != nil {
+	if _, err := g.H.getter.Account(address); err != nil {
 		return nil, err
 	}
 
@@ -35,8 +35,7 @@ func (g OperationsByAccountStreamHandler) NewRequest(base BaseStreamHandler) (St
 func (g *OperationsByAccountStreamHandler) Init() <-chan interface{} {
 	// TODO
 	lo := g.query.ListOptions()
-	iterFunc, closeFunc := item.GetOperationsByAccount(
-		g.H.st,
+	iterFunc, closeFunc := g.H.getter.OperationsByAccount(
 		g.address,
 		storage.NewDefaultListOptions(lo.Reverse(), lo.Cursor(), lo.Limit()),
 	)

@@ -91,10 +91,12 @@ func runDigest(dc *digestConfig) error {
 		return err
 	}
 
+	getter := NewGetterByStorage(st)
+
 	provider := sebak.NewJSONRPCStorageProvider(dc.SEBAK.JSONRpc)
 	sst := sebak.NewStorage(provider)
 
-	runner := digest.NewInitializeDigestRunner(st, sst, nodeInfo)
+	runner := digest.NewInitializeDigestRunner(sst, getter, nodeInfo)
 	if dc.Digest.RemoteBlock > 0 {
 		runner.TestLastRemoteBlock = dc.Digest.RemoteBlock
 	}
@@ -103,7 +105,7 @@ func runDigest(dc *digestConfig) error {
 	}
 
 	if dc.Digest.Watch {
-		watchRunner := digest.NewWatchDigestRunner(st, sst, nodeInfo, runner.StoredRemoteBlock().Height+1)
+		watchRunner := digest.NewWatchDigestRunner(sst, getter, nodeInfo, runner.StoredRemoteBlock().Height+1)
 		watchRunner.SetInterval(dc.Digest.WatchInterval)
 		if err = watchRunner.Run(true); err != nil {
 			return err

@@ -19,8 +19,8 @@ import (
 var maxNumberOfWorkers int = 100
 
 type Digest struct {
-	st            storage.Storage
 	sst           *sebak.Storage
+	getter        item.Getter
 	genesisSource string
 	blocksLimit   uint64
 	start         uint64
@@ -28,14 +28,14 @@ type Digest struct {
 	initialize    bool
 }
 
-func NewDigest(st storage.Storage, sst *sebak.Storage, genesisSource string, start, end uint64, initialize bool) (*Digest, error) {
+func NewDigest(sst *sebak.Storage, getter item.Getter, genesisSource string, start, end uint64, initialize bool) (*Digest, error) {
 	if start > end {
 		return nil, fmt.Errorf("invalid start and end range: %d - %d", start, end)
 	}
 
 	return &Digest{
-		st:            st,
 		sst:           sst.New(),
+		getter:        getter,
 		genesisSource: genesisSource,
 		start:         start,
 		end:           end,
@@ -151,7 +151,7 @@ end:
 	}
 
 	if d.initialize {
-		if err := d.saveAccounts(d.st); err != nil {
+		if err := d.saveAccounts(d.getter.Storage()); err != nil {
 			return err
 		}
 	}
@@ -233,7 +233,7 @@ func (d *Digest) digestBlock(block item.Block) (err error) {
 		return
 	}
 
-	st := d.st.Batch()
+	st := d.getter.Storage().Batch()
 	if err != nil {
 		return err
 	}
@@ -259,7 +259,7 @@ func (d *Digest) logInsertedData() {
 	var blocks, transactions, internals, accounts uint64
 
 	{ // internals
-		iterFunc, closeFunc := d.st.Iterator(
+		iterFunc, closeFunc := d.getter.Storage().Iterator(
 			item.InternalPrefix,
 			"",
 			storage.NewDefaultListOptions(false, nil, 0),
@@ -276,7 +276,7 @@ func (d *Digest) logInsertedData() {
 	}
 
 	{ // blocks
-		iterFunc, closeFunc := d.st.Iterator(
+		iterFunc, closeFunc := d.getter.Storage().Iterator(
 			item.BlockPrefix,
 			item.Block{},
 			storage.NewDefaultListOptions(false, nil, 0),
@@ -292,7 +292,7 @@ func (d *Digest) logInsertedData() {
 	}
 
 	{ // transactions
-		iterFunc, closeFunc := d.st.Iterator(
+		iterFunc, closeFunc := d.getter.Storage().Iterator(
 			item.TransactionPrefix,
 			item.Transaction{},
 			storage.NewDefaultListOptions(false, nil, 0),
@@ -309,7 +309,7 @@ func (d *Digest) logInsertedData() {
 	}
 
 	{ // accounts
-		iterFunc, closeFunc := d.st.Iterator(
+		iterFunc, closeFunc := d.getter.Storage().Iterator(
 			item.AccountPrefix,
 			item.Account{},
 			storage.NewDefaultListOptions(false, nil, 0),

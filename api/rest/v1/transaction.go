@@ -17,7 +17,6 @@ import (
 	"github.com/spikeekips/naru/api/rest"
 	resourcev1 "github.com/spikeekips/naru/api/rest/v1/resource"
 	"github.com/spikeekips/naru/common"
-	"github.com/spikeekips/naru/storage/item"
 )
 
 func (h *Handler) PostTransaction(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +82,7 @@ func (h *Handler) GetTransactionByHash(w http.ResponseWriter, r *http.Request) {
 
 	jw := rest.NewJSONWriter(w, r)
 
-	tx, err := item.GetTransaction(h.st, hash)
+	tx, err := h.getter.Transaction(hash)
 	if err != nil {
 		jw.WriteObject(err)
 		return
@@ -99,7 +98,7 @@ func (h *Handler) GetTransactionStatus(w http.ResponseWriter, r *http.Request) {
 	jw := rest.NewJSONWriter(w, r)
 
 	status := "notfound"
-	if found, err := item.ExistsTransaction(h.st, hash); err != nil {
+	if found, err := h.getter.ExistsTransaction(hash); err != nil {
 		jw.WriteObject(err)
 		return
 	} else if found {

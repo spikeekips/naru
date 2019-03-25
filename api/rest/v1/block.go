@@ -31,9 +31,9 @@ func (h *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
 	height, err = strconv.ParseUint(hash, 10, 64)
 	switch {
 	case err == nil:
-		block, err = item.GetBlockByHeight(h.st, height)
+		block, err = h.getter.BlockByHeight(height)
 	case err != nil:
-		block, err = item.GetBlock(h.st, hash)
+		block, err = h.getter.Block(hash)
 	}
 	if err != nil {
 		jw.WriteObject(err)

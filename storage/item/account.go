@@ -40,8 +40,3 @@ func (a Account) Save(st storage.Storage) error {
 func GetAccountKey(address string) string {
 	return fmt.Sprintf("%s%s", AccountPrefix, address)
 }
-
-func GetAccount(st storage.Storage, address string) (ac Account, err error) {
-	err = st.Get(GetAccountKey(address), &ac)
-	return
-}

@@ -156,14 +156,3 @@ func GetTransactionAccountsKey(address string, block uint64) string {
 		sebakcommon.GetUniqueIDFromUUID(),
 	)
 }
-
-func ExistsTransaction(st storage.Storage, hash string) (bool, error) {
-	return st.Has(GetTransactionKey(hash))
-}
-
-func GetTransaction(st storage.Storage, hash string) (tx Transaction, err error) {
-	if err = st.Get(GetTransactionKey(hash), &tx); err != nil {
-		return
-	}
-	return
-}

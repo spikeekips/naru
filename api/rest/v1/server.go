@@ -9,6 +9,7 @@ import (
 	logging "github.com/inconshreveable/log15"
 	"github.com/spikeekips/naru/cache"
 	"github.com/spikeekips/naru/sebak"
+	"github.com/spikeekips/naru/storage/item"
 	"golang.org/x/net/http2"
 
 	sebakcommon "boscoin.io/sebak/lib/common"
@@ -17,13 +18,12 @@ import (
 	"github.com/spikeekips/naru/api/rest"
 	cachebackend "github.com/spikeekips/naru/cache/backend"
 	"github.com/spikeekips/naru/config"
-	"github.com/spikeekips/naru/storage"
 )
 
 type Server struct {
 	bind      *sebakcommon.Endpoint
-	st        storage.Storage
 	sst       *sebak.Storage
+	getter    item.Getter
 	cch       *cache.Cache
 	sebakInfo sebaknode.NodeInfo
 	core      *http.Server
@@ -31,7 +31,7 @@ type Server struct {
 	router    *mux.Router
 }
 
-func NewServer(nc *config.Network, st storage.Storage, sst *sebak.Storage, cb cachebackend.Backend, sebakInfo sebaknode.NodeInfo) *Server {
+func NewServer(nc *config.Network, sst *sebak.Storage, getter item.Getter, cb cachebackend.Backend, sebakInfo sebaknode.NodeInfo) *Server {
 	httpLog := logging.New("module", "restv1")
 	nc.Log.HTTP.SetLogger(httpLog)
 
@@ -59,8 +59,8 @@ func NewServer(nc *config.Network, st storage.Storage, sst *sebak.Storage, cb ca
 
 	server := &Server{
 		bind:      nc.Bind,
-		st:        st,
 		sst:       sst,
+		getter:    getter,
 		cch:       cch,
 		sebakInfo: sebakInfo,
 		core:      core,
@@ -82,7 +82,7 @@ func (s *Server) AddHandler(pattern string, handler func(http.ResponseWriter, *h
 }
 
 func (s *Server) addDefaultHandlers() {
-	restHandler := NewHandler(s.st, s.sst, s.cch, s.sebakInfo)
+	restHandler := NewHandler(s.sst, s.getter, s.cch, s.sebakInfo)
 
 	s.AddHandler("/", restHandler.Index)
 	s.AddHandler("/api/v1/accounts", restHandler.GetAccounts).
