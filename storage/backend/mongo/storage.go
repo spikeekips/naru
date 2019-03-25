@@ -2,7 +2,6 @@ package mongostorage
 
 import (
 	"context"
-	"encoding/hex"
 	"reflect"
 	"regexp"
 	"time"
@@ -80,7 +79,7 @@ func (b *Storage) Batch() storage.BatchStorage {
 }
 
 func (b *Storage) Has(k string) (bool, error) {
-	q := bson.M{"_k": resolveKey(k)}
+	q := bson.M{KEY: k}
 	cur, err := b.Collection().Find(
 		context.Background(),
 		q,
@@ -120,7 +119,7 @@ func (b *Storage) Get(k string, v interface{}) error {
 		return err
 	}
 
-	r := b.Collection().FindOne(context.Background(), bson.M{"_k": resolveKey(k)})
+	r := b.Collection().FindOne(context.Background(), bson.M{KEY: k})
 	if err := r.Err(); err != nil {
 		return err
 	}
@@ -135,7 +134,7 @@ func (b *Storage) Get(k string, v interface{}) error {
 }
 
 func (b *Storage) Iterator(prefix string, v interface{}, opt storage.ListOptions) (func() (storage.Record, bool), func()) {
-	q := bson.M{"_k": bson.M{"$regex": "^" + regexp.QuoteMeta(resolveKey(prefix))}}
+	q := bson.M{KEY: bson.M{"$regex": "^" + regexp.QuoteMeta(prefix)}}
 
 	reverse := 1
 	if opt.Reverse() {
@@ -153,14 +152,14 @@ func (b *Storage) Iterator(prefix string, v interface{}, opt storage.ListOptions
 		q = bson.M{
 			"$and": bson.A{
 				q,
-				bson.M{"_k": bson.M{dir: resolveKey(string(opt.Cursor()))}},
+				bson.M{KEY: bson.M{dir: string(opt.Cursor())}},
 			},
 		}
 	}
 
 	mopt := options.Find().
 		SetLimit(int64(opt.Limit())).
-		SetSort(bson.M{"_k": reverse})
+		SetSort(bson.M{KEY: reverse})
 
 	cur, err := b.Collection().Find(context.Background(), q, mopt)
 
@@ -196,7 +195,7 @@ func (b *Storage) Insert(k string, v interface{}) error {
 		return err
 	}
 
-	doc, err := NewDocument(resolveKey(k), v)
+	doc, err := NewDocument(k, v)
 	if err != nil {
 		return err
 	}
@@ -223,7 +222,7 @@ func (b *Storage) Delete(k string) error {
 		return err
 	}
 
-	_, err := b.Collection().DeleteOne(context.Background(), bson.M{"_k": resolveKey(k)}, nil)
+	_, err := b.Collection().DeleteOne(context.Background(), bson.M{KEY: k}, nil)
 	return err
 }
 
@@ -241,9 +240,4 @@ func (b *Storage) MultipleDelete(keys ...string) error {
 
 func (b *Storage) Event(event string, values ...interface{}) {
 	storage.Observer.Trigger(event, values...)
-}
-
-func resolveKey(key string) string {
-	n := hex.EncodeToString([]byte(string(key[:2])))
-	return string(n) + string(key[2:])
 }

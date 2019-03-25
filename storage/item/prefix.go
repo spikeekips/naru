@@ -1,14 +1,14 @@
 package item
 
 const (
-	InternalPrefix                = "\x00\x00" // internal data
-	BlockPrefix                   = "\x10\x00" // block
-	BlockHeightPrefix             = "\x10\x01"
-	TransactionPrefix             = "\x20\x00" // transaction
-	TransactionSourcePrefix       = "\x20\x01"
-	TransactionAccountsPrefix     = "\x20\x02"
-	TransactionBlockPrefix        = "\x20\x03"
-	AccountPrefix                 = "\x30\x00" // account
-	OperationPrefix               = "\x40\x00" // operation
-	OperationAccountRelatedPrefix = "\x40\x10"
+	InternalPrefix                = "0000" // internal data
+	BlockPrefix                   = "1000" // block
+	BlockHeightPrefix             = "1001"
+	TransactionPrefix             = "2000" // transaction
+	TransactionSourcePrefix       = "2001"
+	TransactionAccountsPrefix     = "2002"
+	TransactionBlockPrefix        = "2003"
+	AccountPrefix                 = "3000" // account
+	OperationPrefix               = "4000" // operation
+	OperationAccountRelatedPrefix = "4010"
 )

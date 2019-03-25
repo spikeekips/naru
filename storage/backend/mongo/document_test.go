@@ -553,7 +553,7 @@ func (t *testMongoDocumentStore) TestFindMap() {
 		t.NoError(err)
 	}
 
-	cur, err := t.s.Collection().Find(context.Background(), bson.M{DOC.Field("a1"): 1})
+	cur, err := t.s.Collection().Find(context.Background(), bson.M{DocField("a1"): 1})
 	t.NoError(err)
 
 	var records []map[string]uint64

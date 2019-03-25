@@ -139,7 +139,7 @@ func (b *Batch) insert(k string, v interface{}) error {
 	b.Lock()
 	defer b.Unlock()
 
-	doc, err := NewDocument(resolveKey(k), v)
+	doc, err := NewDocument(k, v)
 	if err != nil {
 		return err
 	}
@@ -175,7 +175,7 @@ func (b *Batch) delete(k string) error {
 	b.Lock()
 	defer b.Unlock()
 
-	b.ops = append(b.ops, mongo.NewDeleteOneModel().SetFilter(bson.M{"_k": resolveKey(k)}))
+	b.ops = append(b.ops, mongo.NewDeleteOneModel().SetFilter(bson.M{KEY: k}))
 	log.Debug("delete doc", "key", k)
 
 	return nil

@@ -15,16 +15,11 @@ import (
 type FIELD string
 
 const (
-	KEY FIELD = "_k"
-	DOC FIELD = "_v"
+	KEY string = "_k"
+	DOC string = "_v"
 )
 
-func (f FIELD) Field(fs ...string) string {
-	if f == KEY {
-		log.Crit("KEY does not have sub fields")
-		return ""
-	}
-
+func DocField(fs ...string) string {
 	return fmt.Sprintf("%s.%s", DOC, strings.Join(fs, "."))
 }
 

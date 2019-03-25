@@ -75,10 +75,10 @@ type testMongoStorageItem struct {
 
 func (t *testMongoStorage) TestKey() {
 	key := "showme"
-	o := resolveKey(item.InternalPrefix + key)
+	o := item.InternalPrefix + key
 	t.Equal("0000showme", o)
 
-	n := resolveKey(item.InternalPrefix + "showme")
+	n := item.InternalPrefix + "showme"
 	t.Equal(o, n)
 }
 
@@ -93,7 +93,7 @@ func (t *testMongoStorage) TestInsert() {
 	var items []testMongoStorageItem
 	for i := uint64(0); i < 5; i++ {
 		item := testMongoStorageItem{
-			A: "\x00\x10-" + common.SequentialUUID(),
+			A: "0010-" + common.SequentialUUID(),
 			B: int(i),
 			C: []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
 		}
@@ -115,7 +115,7 @@ func (t *testMongoStorage) TestInsert() {
 		}
 	}
 
-	iter, cls := t.s.Iterator("\x00\x10-", testMongoStorageItem{}, storage.NewDefaultListOptions(false, nil, 0))
+	iter, cls := t.s.Iterator("0010-", testMongoStorageItem{}, storage.NewDefaultListOptions(false, nil, 0))
 
 	var records []storage.Record
 	for {
@@ -254,7 +254,7 @@ func (t *testMongoStorage) TestDeleteBatch() {
 }
 
 func (t *testMongoStorage) TestIteratorLimit() {
-	prefix := "\x00\x10-=---"
+	prefix := "0010-=---"
 
 	var items []testMongoStorageItem
 	for i := uint64(0); i < 5; i++ {
@@ -365,7 +365,7 @@ func (t *testMongoStorage) TestIteratorLimit() {
 }
 
 func (t *testMongoStorage) TestIteratorCursor() {
-	prefix := "\x00\x10-=---"
+	prefix := "0010-=---"
 
 	var items []testMongoStorageItem
 	for i := uint64(0); i < 5; i++ {
@@ -448,7 +448,7 @@ func (t *testMongoStorage) TestIteratorCursor() {
 }
 
 func (t *testMongoStorage) TestIteratorOptions() {
-	prefix := "\x00\x10-=---"
+	prefix := "0010-=---"
 
 	var items []testMongoStorageItem
 	for i := uint64(0); i < 5; i++ {
