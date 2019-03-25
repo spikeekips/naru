@@ -1,10 +1,11 @@
 package mongoitem
 
 import (
-	"fmt"
+	"context"
 
-	sebakerrors "boscoin.io/sebak/lib/errors"
 	sebakstorage "boscoin.io/sebak/lib/storage"
+	"go.mongodb.org/mongo-driver/bson"
+	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/spikeekips/naru/storage"
 	mongostorage "github.com/spikeekips/naru/storage/backend/mongo"
@@ -39,29 +40,59 @@ func (g Getter) Block(hash string) (item.Block, error) {
 }
 
 func (g Getter) BlockByHeight(height uint64) (item.Block, error) {
-	var hash string
-	if err := g.s.Get(item.GetBlockHeightKey(height), &hash); err != nil {
+	col, err := g.s.Collection(item.BlockPrefix)
+	if err != nil {
 		return item.Block{}, err
 	}
 
-	return g.Block(hash)
+	r := col.FindOne(context.Background(), bson.M{mongostorage.DocField("block.header.height"): height})
+	if err := r.Err(); err != nil {
+		return item.Block{}, err
+	}
+
+	raw, err := r.DecodeBytes()
+	if err != nil {
+		return item.Block{}, err
+	}
+
+	var block item.Block
+	_, err = mongostorage.UnmarshalDocument(raw, &block)
+
+	return block, err
 }
 
 func (g Getter) LastBlock() (item.Block, error) {
-	options := storage.NewDefaultListOptions(true, nil, 1)
-	iterFunc, closeFunc := g.s.Iterator(item.BlockHeightPrefix, "", options)
-	i, hasNext := iterFunc()
-	closeFunc()
-	if !hasNext {
-		return item.Block{}, sebakerrors.StorageRecordDoesNotExist
+	col, err := g.s.Collection(item.BlockPrefix)
+	if err != nil {
+		return item.Block{}, err
 	}
 
-	hash, ok := i.Value.(string)
-	if !ok {
-		return item.Block{}, storage.DecodeValueFailed.New()
+	cur, err := col.Find(
+		context.Background(),
+		bson.M{},
+		mongooptions.Find().
+			SetSort(bson.M{mongostorage.DocField("block.header.height"): -1}).
+			SetLimit(1),
+	)
+	if err != nil {
+		return item.Block{}, err
+	}
+	defer cur.Close(context.Background())
+
+	if !cur.Next(context.Background()) {
+		return item.Block{}, err
+	}
+	if err := cur.Err(); err != nil {
+		return item.Block{}, err
 	}
 
-	return g.Block(hash)
+	var block item.Block
+	_, err = mongostorage.UnmarshalDocument([]byte(cur.Current), &block)
+	if err != nil {
+		return item.Block{}, err
+	}
+
+	return block, err
 }
 
 func (g Getter) BlocksIterator(
@@ -103,28 +134,68 @@ func (g Getter) OperationsByAccount(address string, options storage.ListOptions)
 	func() (item.Operation, bool, []byte),
 	func(),
 ) {
-	iterFunc, closeFunc := g.s.Iterator(fmt.Sprintf("%s%s", item.OperationAccountRelatedPrefix, address), "", options)
+	nullIterFunc := func() (item.Operation, bool, []byte) {
+		return item.Operation{}, false, nil
+	}
+	nullCloseFunc := func() {}
 
-	return (func() (item.Operation, bool, []byte) {
-			it, hasNext := iterFunc()
-			if !hasNext {
-				return item.Operation{}, false, []byte(it.Key)
+	col, err := g.s.Collection(item.OperationPrefix)
+	if err != nil {
+		return nullIterFunc, nullCloseFunc
+	}
+
+	q := bson.M{
+		"$or": bson.A{
+			bson.M{mongostorage.DocField("source"): address},
+			bson.M{mongostorage.DocField("target"): address},
+		},
+	}
+
+	reverse := 1
+	if options.Reverse() {
+		reverse = -1
+	}
+
+	if len(options.Cursor()) > 0 {
+		dir := "$lt"
+		if options.Reverse() {
+			dir = "$gt"
+		}
+
+		q = bson.M{
+			"$and": bson.A{
+				bson.M{mongostorage.DocField("hash"): bson.M{dir: string(options.Cursor())}},
+				q,
+			}}
+	}
+
+	cur, err := col.Find(
+		context.Background(),
+		q,
+		mongooptions.Find().
+			SetSort(bson.M{mongostorage.DocField("height"): reverse}).
+			SetLimit(int64(options.Limit())),
+	)
+	if err != nil {
+		return nullIterFunc, nullCloseFunc
+	}
+	defer cur.Close(context.Background())
+
+	return func() (item.Operation, bool, []byte) {
+			next := cur.Next(context.Background())
+			if !next {
+				defer cur.Close(context.Background())
+				return item.Operation{}, false, nil
 			}
 
-			hash, ok := it.Value.(string)
-			if !ok {
-				return item.Operation{}, false, []byte(it.Key)
-			}
-
-			o, err := g.Operation(hash)
-			if err != nil {
-				return item.Operation{}, false, []byte(it.Key)
-			}
-
-			return o, hasNext, []byte(it.Key)
-		}), (func() {
-			closeFunc()
-		})
+			b := []byte(cur.Current)
+			var operation item.Operation
+			_, err = mongostorage.UnmarshalDocument(b, &operation)
+			return operation, true, b
+		},
+		func() {
+			cur.Close(context.Background())
+		}
 }
 
 func (g Getter) ExistsTransaction(hash string) (bool, error) {
@@ -132,8 +203,6 @@ func (g Getter) ExistsTransaction(hash string) (bool, error) {
 }
 
 func (g Getter) Transaction(hash string) (tx item.Transaction, err error) {
-	if err = g.s.Get(item.GetTransactionKey(hash), &tx); err != nil {
-		return
-	}
+	err = g.s.Get(item.GetTransactionKey(hash), &tx)
 	return
 }
