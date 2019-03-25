@@ -1,6 +1,7 @@
 package mongostorage
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"runtime/debug"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	sebakcommon "boscoin.io/sebak/lib/common"
+	"github.com/spikeekips/naru/common"
 	"github.com/stretchr/testify/suite"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsoncodec"
@@ -531,6 +533,159 @@ func (t *testMongoValue) TestSerializeSEBAKAmount() {
 
 }
 
+type testMongoDocumentStore struct {
+	baseTestMongoStorage
+}
+
+func (t *testMongoDocumentStore) TestFindMap() {
+	key := "showme"
+	value := map[string]uint64{
+		"a1": 1,
+		"a2": 2,
+	}
+
+	err := t.s.Insert(key, value)
+	t.NoError(err)
+
+	{
+		var record map[string]uint64
+		err := t.s.Get(key, &record)
+		t.NoError(err)
+	}
+
+	cur, err := t.s.Collection().Find(context.Background(), bson.M{"_v.a1": 1})
+	t.NoError(err)
+
+	var records []map[string]uint64
+	for cur.Next(context.Background()) {
+		var value map[string]uint64
+		_, err := UnmarshalDocument([]byte(cur.Current), &value)
+		t.NoError(err)
+
+		records = append(records, value)
+	}
+	err = cur.Err()
+	t.NoError(err)
+
+	t.Equal(1, len(records))
+
+	for k, v := range records[0] {
+		t.Equal(value[k], v)
+	}
+}
+
+func (t *testMongoDocumentStore) TestFindStruct() {
+	defer func() {
+		if r := recover(); r != nil {
+			debug.PrintStack()
+			panic(r)
+		}
+	}()
+
+	key := "showme"
+	value := testUnmarshalStruct{
+		A: "AAA",
+		B: 99,
+		C: []uint64{7, 8, 9},
+	}
+
+	err := t.s.Insert(key, value)
+	t.NoError(err)
+
+	for i := 0; i < 5; i++ {
+		key := common.RandomUUID()
+		value := testUnmarshalStruct{
+			A: common.RandomUUID(),
+			B: 199,
+			C: []uint64{7, 8, 9},
+		}
+		err := t.s.Insert(key, value)
+		t.NoError(err)
+	}
+
+	{
+		var record testUnmarshalStruct
+		err := t.s.Get(key, &record)
+		t.NoError(err)
+	}
+
+	compare := func(records []testUnmarshalStruct) {
+		t.Equal(1, len(records))
+
+		t.Equal(value.A, records[0].A)
+		t.Equal(value.B, records[0].B)
+		t.Equal(value.C, records[0].C)
+	}
+
+	{
+		cur, err := t.s.Collection().Find(context.Background(), bson.M{"_v.a": "AAA"})
+		t.NoError(err)
+
+		var records []testUnmarshalStruct
+		for cur.Next(context.Background()) {
+			var value testUnmarshalStruct
+			_, err := UnmarshalDocument([]byte(cur.Current), &value)
+			t.NoError(err)
+
+			records = append(records, value)
+		}
+		err = cur.Err()
+		t.NoError(err)
+
+		compare(records)
+	}
+
+	{
+		cur, err := t.s.Collection().Find(context.Background(), bson.M{"_v.b": 99})
+		t.NoError(err)
+
+		var records []testUnmarshalStruct
+		for cur.Next(context.Background()) {
+			var value testUnmarshalStruct
+			_, err := UnmarshalDocument([]byte(cur.Current), &value)
+			t.NoError(err)
+
+			records = append(records, value)
+		}
+		err = cur.Err()
+		t.NoError(err)
+
+		compare(records)
+	}
+
+	{
+		cur, err := t.s.Collection().Find(
+			context.Background(),
+			bson.M{"_v.a": "AAA", "_v.c": bson.M{"$in": bson.A{7}}},
+		)
+		t.NoError(err)
+
+		var records []testUnmarshalStruct
+		for cur.Next(context.Background()) {
+			var value testUnmarshalStruct
+			_, err := UnmarshalDocument([]byte(cur.Current), &value)
+			t.NoError(err)
+
+			records = append(records, value)
+		}
+		err = cur.Err()
+		t.NoError(err)
+
+		compare(records)
+	}
+}
+
 func TestMongoValue(t *testing.T) {
 	suite.Run(t, new(testMongoValue))
+}
+
+func TestMongoDocumentStore(t *testing.T) {
+	if client, err := connect(); err != nil {
+		log.Warn("mongodb test will be skipped")
+		return
+	} else {
+		disconnect(client)
+	}
+
+	suite.Run(t, new(testMongoDocumentStore))
 }
