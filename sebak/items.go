@@ -8,8 +8,8 @@ import (
 	sebakstorage "boscoin.io/sebak/lib/storage"
 	sebaktransaction "boscoin.io/sebak/lib/transaction"
 
+	"github.com/spikeekips/naru/element"
 	"github.com/spikeekips/naru/storage"
-	"github.com/spikeekips/naru/storage/item"
 )
 
 func GetBlockByHeight(s *Storage, height uint64) (block sebakblock.Block, err error) {
@@ -96,7 +96,7 @@ func GetBlocks(s *Storage, options sebakstorage.ListOptions) (func() (sebakblock
 	return iterFunc, cf
 }
 
-func GetTransactions(s *Storage, hashes ...string) (txs []item.TransactionMessage, err error) {
+func GetTransactions(s *Storage, hashes ...string) (txs []element.TransactionMessage, err error) {
 	for _, hash := range hashes {
 		if len(hash) < 1 {
 			continue
@@ -113,7 +113,7 @@ func GetTransactions(s *Storage, hashes ...string) (txs []item.TransactionMessag
 			return
 		}
 
-		txs = append(txs, item.NewTransactionMessage(tx, tp.Message))
+		txs = append(txs, element.NewTransactionMessage(tx, tp.Message))
 	}
 
 	return
@@ -135,32 +135,32 @@ func AccountKey(address string) string {
 	return fmt.Sprintf("%s%s", sebakcommon.BlockAccountPrefixAddress, address)
 }
 
-func GetAccounts(s *Storage, options sebakstorage.ListOptions) (func() (item.Account, bool), func()) {
+func GetAccounts(s *Storage, options sebakstorage.ListOptions) (func() (element.Account, bool), func()) {
 	itf, cf := s.GetIterator(sebakcommon.BlockAccountPrefixAddress, options)
 
-	iterFunc := func() (item.Account, bool) {
+	iterFunc := func() (element.Account, bool) {
 		it, next := itf()
 		if !next {
-			return item.Account{}, next
+			return element.Account{}, next
 		}
 
 		var ac sebakblock.BlockAccount
 		if err := storage.Deserialize(it.Value, &ac); err != nil {
 			log.Error("failed to deserialize account", "error", err)
-			return item.Account{}, false
+			return element.Account{}, false
 		}
 
-		return item.NewAccount(ac), true
+		return element.NewAccount(ac), true
 	}
 
 	return iterFunc, cf
 }
 
-func GetAccount(s *Storage, address string) (item.Account, error) {
+func GetAccount(s *Storage, address string) (element.Account, error) {
 	var ac sebakblock.BlockAccount
 	if _, err := s.Get(AccountKey(address), &ac); err != nil {
-		return item.Account{}, err
+		return element.Account{}, err
 	}
 
-	return item.NewAccount(ac), nil
+	return element.NewAccount(ac), nil
 }

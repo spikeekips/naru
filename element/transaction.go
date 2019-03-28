@@ -1,4 +1,4 @@
-package item
+package element
 
 import (
 	"encoding/json"
@@ -126,33 +126,4 @@ func (t Transaction) AllAccounts() []string {
 
 func GetTransactionKey(hash string) string {
 	return fmt.Sprintf("%s%s", TransactionPrefix, hash)
-}
-
-func GetTransactionBlockKey(block uint64) string {
-	return fmt.Sprintf(
-		"%s%020d%s",
-		TransactionBlockPrefix,
-		block,
-		sebakcommon.GetUniqueIDFromUUID(),
-	)
-}
-
-func GetTransactionSourceKey(source string, block uint64) string {
-	return fmt.Sprintf(
-		"%s%s%020d%s",
-		TransactionSourcePrefix,
-		source,
-		block,
-		sebakcommon.GetUniqueIDFromUUID(),
-	)
-}
-
-func GetTransactionAccountsKey(address string, block uint64) string {
-	return fmt.Sprintf(
-		"%s%s%020d%s",
-		TransactionAccountsPrefix,
-		address,
-		block,
-		sebakcommon.GetUniqueIDFromUUID(),
-	)
 }

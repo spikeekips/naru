@@ -8,8 +8,8 @@ import (
 	"github.com/gorilla/mux"
 	logging "github.com/inconshreveable/log15"
 	"github.com/spikeekips/naru/cache"
+	"github.com/spikeekips/naru/element"
 	"github.com/spikeekips/naru/sebak"
-	"github.com/spikeekips/naru/storage/item"
 	"golang.org/x/net/http2"
 
 	sebakcommon "boscoin.io/sebak/lib/common"
@@ -23,7 +23,7 @@ import (
 type Server struct {
 	bind      *sebakcommon.Endpoint
 	sst       *sebak.Storage
-	getter    item.Getter
+	potion    element.Potion
 	cch       *cache.Cache
 	sebakInfo sebaknode.NodeInfo
 	core      *http.Server
@@ -31,7 +31,7 @@ type Server struct {
 	router    *mux.Router
 }
 
-func NewServer(nc *config.Network, sst *sebak.Storage, getter item.Getter, cb cachebackend.Backend, sebakInfo sebaknode.NodeInfo) *Server {
+func NewServer(nc *config.Network, sst *sebak.Storage, potion element.Potion, cb cachebackend.Backend, sebakInfo sebaknode.NodeInfo) *Server {
 	httpLog := logging.New("module", "restv1")
 	nc.Log.HTTP.SetLogger(httpLog)
 
@@ -60,7 +60,7 @@ func NewServer(nc *config.Network, sst *sebak.Storage, getter item.Getter, cb ca
 	server := &Server{
 		bind:      nc.Bind,
 		sst:       sst,
-		getter:    getter,
+		potion:    potion,
 		cch:       cch,
 		sebakInfo: sebakInfo,
 		core:      core,
@@ -82,7 +82,7 @@ func (s *Server) AddHandler(pattern string, handler func(http.ResponseWriter, *h
 }
 
 func (s *Server) addDefaultHandlers() {
-	restHandler := NewHandler(s.sst, s.getter, s.cch, s.sebakInfo)
+	restHandler := NewHandler(s.sst, s.potion, s.cch, s.sebakInfo)
 
 	s.AddHandler("/", restHandler.Index)
 	s.AddHandler("/api/v1/accounts", restHandler.GetAccounts).

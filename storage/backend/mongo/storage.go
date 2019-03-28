@@ -83,6 +83,10 @@ func (b *Storage) Close() error {
 	return b.c.Disconnect(context.Background())
 }
 
+func (b *Storage) Initialize() error {
+	return b.Database().Drop(context.Background())
+}
+
 func (b *Storage) Batch() storage.BatchStorage {
 	return NewBatch(b)
 }
@@ -258,18 +262,6 @@ func (b *Storage) Delete(k string) error {
 
 	_, err = col.DeleteOne(context.Background(), bson.M{KEY: k}, nil)
 	return err
-}
-
-func (b *Storage) MultipleInsert(items ...storage.Value) error {
-	return nil
-}
-
-func (b *Storage) MultipleUpdate(items ...storage.Value) error {
-	return nil
-}
-
-func (b *Storage) MultipleDelete(keys ...string) error {
-	return nil
 }
 
 func (b *Storage) Event(event string, values ...interface{}) {

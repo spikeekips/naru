@@ -25,6 +25,10 @@ func NewBatch(s *Storage) *Batch {
 	}
 }
 
+func (b *Batch) Initialize() error {
+	return nil
+}
+
 func (b *Batch) Has(k string) (bool, error) {
 	return b.s.Has(k)
 }

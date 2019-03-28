@@ -1,4 +1,4 @@
-package item
+package element
 
 import (
 	sebakstorage "boscoin.io/sebak/lib/storage"
@@ -6,7 +6,7 @@ import (
 	"github.com/spikeekips/naru/storage"
 )
 
-type Getter interface {
+type Potion interface {
 	Storage() storage.Storage
 	Account( /* address */ string) (Account, error)
 	Block( /* hash */ string) (Block, error)

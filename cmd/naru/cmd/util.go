@@ -14,13 +14,13 @@ import (
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/config"
 	"github.com/spikeekips/naru/digest"
+	"github.com/spikeekips/naru/element"
+	leveldbitem "github.com/spikeekips/naru/element/leveldb"
+	mongoitem "github.com/spikeekips/naru/element/mongo"
 	"github.com/spikeekips/naru/sebak"
 	"github.com/spikeekips/naru/storage"
 	leveldbstorage "github.com/spikeekips/naru/storage/backend/leveldb"
 	mongostorage "github.com/spikeekips/naru/storage/backend/mongo"
-	"github.com/spikeekips/naru/storage/item"
-	leveldbitem "github.com/spikeekips/naru/storage/item/leveldb"
-	mongoitem "github.com/spikeekips/naru/storage/item/mongo"
 )
 
 func getNodeInfo(endpoint *sebakcommon.Endpoint) (sebaknode.NodeInfo, error) {
@@ -85,12 +85,12 @@ func NewStorageByConfig(c *config.Storage) (storage.Storage, error) {
 	return st, nil
 }
 
-func NewGetterByStorage(st storage.Storage) item.Getter {
+func NewPotionByStorage(st storage.Storage) element.Potion {
 	switch st.(type) {
 	case *mongostorage.Storage:
-		return mongoitem.NewGetter(st.(*mongostorage.Storage))
+		return mongoitem.NewPotion(st.(*mongostorage.Storage))
 	case *leveldbstorage.Storage:
-		return leveldbitem.NewGetter(st.(*leveldbstorage.Storage))
+		return leveldbitem.NewPotion(st.(*leveldbstorage.Storage))
 	default:
 		panic(errors.New("invalid storage type found"))
 	}

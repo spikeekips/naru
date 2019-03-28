@@ -12,8 +12,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/spikeekips/naru/common"
+	"github.com/spikeekips/naru/element"
 	"github.com/spikeekips/naru/storage"
-	"github.com/spikeekips/naru/storage/item"
 )
 
 type testMongoData struct {
@@ -57,7 +57,7 @@ func (t *testMongoData) TestInsertAmount() {
 		t.Equal(value.B, n.B)
 	}
 
-	err := t.s.Insert(item.InternalPrefix[:2]+common.RandomUUID(), value)
+	err := t.s.Insert(element.InternalPrefix[:2]+common.RandomUUID(), value)
 	t.NoError(err)
 }
 
@@ -119,21 +119,21 @@ func (t *testMongoData) TestInsertTrnasaction() {
 		93, 125, 125,
 	}
 
-	var block item.Block
+	var block element.Block
 	{
 		var blk sebakblock.Block
 		err := storage.Deserialize(bblock, &blk)
 		t.NoError(err)
-		block = item.NewBlock(blk)
+		block = element.NewBlock(blk)
 	}
 
-	var itx item.Transaction
+	var itx element.Transaction
 	{
 		var tx sebaktransaction.Transaction
 		err := storage.Deserialize(btx, &tx)
 		t.NoError(err)
 
-		itx = item.NewTransaction(tx, block, btx)
+		itx = element.NewTransaction(tx, block, btx)
 	}
 
 	{
@@ -141,7 +141,7 @@ func (t *testMongoData) TestInsertTrnasaction() {
 		b, err := bson.Marshal(itx)
 		t.NoError(err)
 
-		var ntx item.Transaction
+		var ntx element.Transaction
 		err = bson.Unmarshal(b, &ntx)
 		t.NoError(err)
 		t.Equal(itx.Hash, ntx.Hash)

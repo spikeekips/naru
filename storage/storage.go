@@ -1,10 +1,7 @@
 package storage
 
-import (
-	"github.com/spikeekips/naru/query"
-)
-
 type Storage interface {
+	Initialize() error
 	Batch() BatchStorage
 	Has(string) (bool, error)
 	Get(string, interface{}) error
@@ -12,17 +9,7 @@ type Storage interface {
 	Insert(string, interface{}) error
 	Update(string, interface{}) error
 	Delete(string) error
-	MultipleInsert(...Value) error
-	MultipleUpdate(...Value) error
-	MultipleDelete(...string) error
 	Event(string, ...interface{})
-}
-
-type FilterableStorage interface {
-	Storage
-	Filter(query.Query, ListOptions) (func(interface{} /* result item */, bool /* has next */), func() /* close func */)
-	FilterUpdate(query.Query, []byte) ( /* list of keys */ []string, error)
-	FilterDelete(query.Query) ( /* list of keys */ []string, error)
 }
 
 type BatchStorage interface {

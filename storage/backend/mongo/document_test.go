@@ -10,7 +10,7 @@ import (
 
 	sebakcommon "boscoin.io/sebak/lib/common"
 	"github.com/spikeekips/naru/common"
-	"github.com/spikeekips/naru/storage/item"
+	"github.com/spikeekips/naru/element"
 	"github.com/stretchr/testify/suite"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsoncodec"
@@ -539,7 +539,7 @@ type testMongoDocumentStore struct {
 }
 
 func (t *testMongoDocumentStore) TestFindMap() {
-	key := item.InternalPrefix[:2] + "showme"
+	key := element.InternalPrefix[:2] + "showme"
 	value := map[string]uint64{
 		"a1": 1,
 		"a2": 2,
@@ -584,7 +584,7 @@ func (t *testMongoDocumentStore) TestFindStruct() {
 		}
 	}()
 
-	key := item.InternalPrefix[:2] + "showme"
+	key := element.InternalPrefix[:2] + "showme"
 	value := testUnmarshalStruct{
 		A: "AAA",
 		B: 99,
@@ -595,7 +595,7 @@ func (t *testMongoDocumentStore) TestFindStruct() {
 	t.NoError(err)
 
 	for i := 0; i < 5; i++ {
-		key := item.InternalPrefix[:2] + common.RandomUUID()
+		key := element.InternalPrefix[:2] + common.RandomUUID()
 		value := testUnmarshalStruct{
 			A: common.RandomUUID(),
 			B: 199,

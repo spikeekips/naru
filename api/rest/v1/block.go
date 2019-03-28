@@ -12,7 +12,7 @@ import (
 	sebakresource "boscoin.io/sebak/lib/node/runner/api/resource"
 
 	"github.com/spikeekips/naru/api/rest"
-	"github.com/spikeekips/naru/storage/item"
+	"github.com/spikeekips/naru/element"
 )
 
 func (h *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
@@ -25,15 +25,15 @@ func (h *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var block item.Block
+	var block element.Block
 	var err error
 	var height uint64
 	height, err = strconv.ParseUint(hash, 10, 64)
 	switch {
 	case err == nil:
-		block, err = h.getter.BlockByHeight(height)
+		block, err = h.potion.BlockByHeight(height)
 	case err != nil:
-		block, err = h.getter.Block(hash)
+		block, err = h.potion.Block(hash)
 	}
 	if err != nil {
 		jw.WriteObject(err)

@@ -1,4 +1,4 @@
-package item
+package element
 
 import (
 	"fmt"
@@ -62,6 +62,7 @@ func NewOperation(op sebakoperation.Operation, tx sebaktransaction.Transaction, 
 func GetOperationHash(txHash string, opIndex uint64) string {
 	return fmt.Sprintf("%s%06d", txHash, opIndex)
 }
+
 func GetOperationKey(hash string) string {
 	return fmt.Sprintf("%s%s", OperationPrefix, hash)
 }
@@ -72,16 +73,6 @@ func GetOperationAccountRelatedEventKey(address string) string {
 		EventPrefixNewOperation,
 		OperationAccountRelatedPrefix,
 		address,
-	)
-}
-
-func GetOperationAccountRelatedKey(address string, blockHeight uint64) string {
-	return fmt.Sprintf(
-		"%s%s%20d%s",
-		OperationAccountRelatedPrefix,
-		address,
-		blockHeight,
-		sebakcommon.GetUniqueIDFromUUID(),
 	)
 }
 

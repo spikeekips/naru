@@ -22,7 +22,7 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 
 	jw := rest.NewJSONWriter(w, r)
 
-	ac, err := h.getter.Account(address)
+	ac, err := h.potion.Account(address)
 	if err != nil {
 		jw.WriteObject(err)
 		return
@@ -57,7 +57,7 @@ func (h *Handler) GetAccounts(w http.ResponseWriter, r *http.Request) {
 
 	var rs []sebakresource.Resource
 	for _, address := range addresses {
-		ac, err := h.getter.Account(address)
+		ac, err := h.potion.Account(address)
 		if err != nil {
 			jw.WriteObject(err)
 			return

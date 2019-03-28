@@ -14,8 +14,8 @@ import (
 
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/config"
+	"github.com/spikeekips/naru/element"
 	"github.com/spikeekips/naru/storage"
-	"github.com/spikeekips/naru/storage/item"
 )
 
 type baseTestMongoStorage struct {
@@ -75,10 +75,10 @@ type testMongoStorageItem struct {
 
 func (t *testMongoStorage) TestKey() {
 	key := "showme"
-	o := item.InternalPrefix + key
+	o := element.InternalPrefix + key
 	t.Equal("0000showme", o)
 
-	n := item.InternalPrefix + "showme"
+	n := element.InternalPrefix + "showme"
 	t.Equal(o, n)
 }
 
@@ -146,7 +146,7 @@ func (t *testMongoStorage) TestInsertBatch() {
 	var items []testMongoStorageItem
 	for i := uint64(0); i < 5; i++ {
 		item := testMongoStorageItem{
-			A: item.InternalPrefix[:2] + "AAA-" + common.RandomUUID(),
+			A: element.InternalPrefix[:2] + "AAA-" + common.RandomUUID(),
 			B: int(i),
 			C: []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
 		}
@@ -184,7 +184,7 @@ func (t *testMongoStorage) TestUpdateBatch() {
 	var items []testMongoStorageItem
 	for i := uint64(0); i < 5; i++ {
 		item := testMongoStorageItem{
-			A:    item.InternalPrefix[:2] + "AAA-" + common.RandomUUID(),
+			A:    element.InternalPrefix[:2] + "AAA-" + common.RandomUUID(),
 			B:    int(i),
 			BOld: int(i),
 			C:    []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
@@ -226,7 +226,7 @@ func (t *testMongoStorage) TestDeleteBatch() {
 	var items []testMongoStorageItem
 	for i := uint64(0); i < 5; i++ {
 		item := testMongoStorageItem{
-			A:    item.InternalPrefix[:2] + "AAA-" + common.RandomUUID(),
+			A:    element.InternalPrefix[:2] + "AAA-" + common.RandomUUID(),
 			B:    int(i),
 			BOld: int(i),
 			C:    []uint64{(i * 3), (i * 3) + 1, (i * 3) + 2},
@@ -537,7 +537,7 @@ func (t *testMongoStorage) TestIteratorOptions() {
 
 func (t *testMongoStorage) TestInsertWithoutDocument() {
 	value := "findme"
-	col, _ := t.s.Collection(item.InternalPrefix[:2])
+	col, _ := t.s.Collection(element.InternalPrefix[:2])
 	r, err := col.InsertOne(context.Background(), value)
 	t.Error(err, "WriteString can only write")
 	t.Nil(r)

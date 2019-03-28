@@ -82,7 +82,7 @@ func (h *Handler) GetTransactionByHash(w http.ResponseWriter, r *http.Request) {
 
 	jw := rest.NewJSONWriter(w, r)
 
-	tx, err := h.getter.Transaction(hash)
+	tx, err := h.potion.Transaction(hash)
 	if err != nil {
 		jw.WriteObject(err)
 		return
@@ -98,7 +98,7 @@ func (h *Handler) GetTransactionStatus(w http.ResponseWriter, r *http.Request) {
 	jw := rest.NewJSONWriter(w, r)
 
 	status := "notfound"
-	if found, err := h.getter.ExistsTransaction(hash); err != nil {
+	if found, err := h.potion.ExistsTransaction(hash); err != nil {
 		jw.WriteObject(err)
 		return
 	} else if found {

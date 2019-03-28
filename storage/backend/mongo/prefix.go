@@ -1,14 +1,14 @@
 package mongostorage
 
-import "github.com/spikeekips/naru/storage/item"
+import "github.com/spikeekips/naru/element"
 
 var (
 	CollectionByPrefix = map[string]string{
-		item.InternalPrefix[:2]:    "internal",
-		item.BlockPrefix[:2]:       "block",
-		item.TransactionPrefix[:2]: "transaction",
-		item.AccountPrefix[:2]:     "account",
-		item.OperationPrefix[:2]:   "operation",
+		element.InternalPrefix[:2]:    "internal",
+		element.BlockPrefix[:2]:       "block",
+		element.TransactionPrefix[:2]: "transaction",
+		element.AccountPrefix[:2]:     "account",
+		element.OperationPrefix[:2]:   "operation",
 	}
 )
 

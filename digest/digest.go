@@ -11,16 +11,16 @@ import (
 	sebakrunner "boscoin.io/sebak/lib/node/runner"
 	sebakstorage "boscoin.io/sebak/lib/storage"
 
+	"github.com/spikeekips/naru/element"
 	"github.com/spikeekips/naru/sebak"
 	"github.com/spikeekips/naru/storage"
-	"github.com/spikeekips/naru/storage/item"
 )
 
 var maxNumberOfWorkers int = 100
 
 type Digest struct {
 	sst           *sebak.Storage
-	getter        item.Getter
+	potion        element.Potion
 	genesisSource string
 	blocksLimit   uint64
 	start         uint64
@@ -28,14 +28,14 @@ type Digest struct {
 	initialize    bool
 }
 
-func NewDigest(sst *sebak.Storage, getter item.Getter, genesisSource string, start, end uint64, initialize bool) (*Digest, error) {
+func NewDigest(sst *sebak.Storage, potion element.Potion, genesisSource string, start, end uint64, initialize bool) (*Digest, error) {
 	if start > end {
 		return nil, fmt.Errorf("invalid start and end range: %d - %d", start, end)
 	}
 
 	return &Digest{
 		sst:           sst.New(),
-		getter:        getter,
+		potion:        potion,
 		genesisSource: genesisSource,
 		start:         start,
 		end:           end,
@@ -151,7 +151,7 @@ end:
 	}
 
 	if d.initialize {
-		if err := d.saveAccounts(d.getter.Storage()); err != nil {
+		if err := d.saveAccounts(d.potion.Storage()); err != nil {
 			return err
 		}
 	}
@@ -199,7 +199,7 @@ func (d *Digest) digestBlocksByHeight(start, end uint64) error {
 	iterFunc, closeFunc := sebak.GetBlocks(d.sst, options)
 	defer closeFunc()
 
-	var block item.Block
+	var block element.Block
 	var n int
 	for {
 		blk, hasNext := iterFunc()
@@ -210,7 +210,7 @@ func (d *Digest) digestBlocksByHeight(start, end uint64) error {
 			break
 		}
 
-		block = item.NewBlock(blk)
+		block = element.NewBlock(blk)
 		if err := d.digestBlock(block); err != nil {
 			return err
 		}
@@ -222,7 +222,7 @@ func (d *Digest) digestBlocksByHeight(start, end uint64) error {
 	return nil
 }
 
-func (d *Digest) digestBlock(block item.Block) (err error) {
+func (d *Digest) digestBlock(block element.Block) (err error) {
 	var txHashes []string
 	txHashes = append(txHashes, block.Transactions...)
 	txHashes = append(txHashes, block.ProposerTransaction)
@@ -233,7 +233,7 @@ func (d *Digest) digestBlock(block item.Block) (err error) {
 		return
 	}
 
-	st := d.getter.Storage().Batch()
+	st := d.potion.Storage().Batch()
 	if err != nil {
 		return err
 	}
@@ -259,8 +259,8 @@ func (d *Digest) logInsertedData() {
 	var blocks, transactions, internals, accounts uint64
 
 	{ // internals
-		iterFunc, closeFunc := d.getter.Storage().Iterator(
-			item.InternalPrefix,
+		iterFunc, closeFunc := d.potion.Storage().Iterator(
+			element.InternalPrefix,
 			"",
 			storage.NewDefaultListOptions(false, nil, 0),
 		)
@@ -276,9 +276,9 @@ func (d *Digest) logInsertedData() {
 	}
 
 	{ // blocks
-		iterFunc, closeFunc := d.getter.Storage().Iterator(
-			item.BlockPrefix,
-			item.Block{},
+		iterFunc, closeFunc := d.potion.Storage().Iterator(
+			element.BlockPrefix,
+			element.Block{},
 			storage.NewDefaultListOptions(false, nil, 0),
 		)
 		defer closeFunc()
@@ -292,9 +292,9 @@ func (d *Digest) logInsertedData() {
 	}
 
 	{ // transactions
-		iterFunc, closeFunc := d.getter.Storage().Iterator(
-			item.TransactionPrefix,
-			item.Transaction{},
+		iterFunc, closeFunc := d.potion.Storage().Iterator(
+			element.TransactionPrefix,
+			element.Transaction{},
 			storage.NewDefaultListOptions(false, nil, 0),
 		)
 		defer closeFunc()
@@ -309,9 +309,9 @@ func (d *Digest) logInsertedData() {
 	}
 
 	{ // accounts
-		iterFunc, closeFunc := d.getter.Storage().Iterator(
-			item.AccountPrefix,
-			item.Account{},
+		iterFunc, closeFunc := d.potion.Storage().Iterator(
+			element.AccountPrefix,
+			element.Account{},
 			storage.NewDefaultListOptions(false, nil, 0),
 		)
 		defer closeFunc()
@@ -375,10 +375,10 @@ func (d *Digest) saveAccounts(st storage.Storage, addresses ...string) error {
 	return nil
 }
 
-func (d *Digest) saveBlock(st storage.Storage, block item.Block, txs []item.TransactionMessage) error {
+func (d *Digest) saveBlock(st storage.Storage, block element.Block, txs []element.TransactionMessage) error {
 	var addresses []string
 	for _, txm := range txs {
-		tx := item.NewTransaction(txm.Transaction, block, txm.Raw)
+		tx := element.NewTransaction(txm.Transaction, block, txm.Raw)
 		if err := tx.Save(st); err != nil {
 			log.Error("failed to save transaction", "tx", tx.Hash, "error", err)
 			return err

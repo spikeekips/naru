@@ -5,8 +5,8 @@ import (
 
 	sebakapi "boscoin.io/sebak/lib/node/runner/api"
 
+	"github.com/spikeekips/naru/element"
 	"github.com/spikeekips/naru/storage"
-	"github.com/spikeekips/naru/storage/item"
 )
 
 type OperationsByAccountStreamHandler struct {
@@ -20,7 +20,7 @@ func (g OperationsByAccountStreamHandler) NewRequest(base BaseStreamHandler) (St
 	vars := mux.Vars(base.Request())
 	address := vars["id"]
 
-	if _, err := g.H.getter.Account(address); err != nil {
+	if _, err := g.H.potion.Account(address); err != nil {
 		return nil, err
 	}
 
@@ -35,7 +35,7 @@ func (g OperationsByAccountStreamHandler) NewRequest(base BaseStreamHandler) (St
 func (g *OperationsByAccountStreamHandler) Init() <-chan interface{} {
 	// TODO
 	lo := g.query.ListOptions()
-	iterFunc, closeFunc := g.H.getter.OperationsByAccount(
+	iterFunc, closeFunc := g.H.potion.OperationsByAccount(
 		g.address,
 		storage.NewDefaultListOptions(lo.Reverse(), lo.Cursor(), lo.Limit()),
 	)
@@ -61,7 +61,7 @@ func (g *OperationsByAccountStreamHandler) Init() <-chan interface{} {
 }
 
 func (g *OperationsByAccountStreamHandler) Stream() (<-chan interface{}, func()) {
-	event := item.GetOperationAccountRelatedEventKey(g.address)
+	event := element.GetOperationAccountRelatedEventKey(g.address)
 
 	ch := make(chan interface{})
 	callback := func(items ...interface{}) {

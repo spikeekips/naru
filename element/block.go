@@ -1,4 +1,4 @@
-package item
+package element
 
 import (
 	"fmt"
@@ -28,8 +28,4 @@ func (b Block) Save(st storage.Storage) error {
 
 func GetBlockKey(hash string) string {
 	return fmt.Sprintf("%s%s", BlockPrefix, hash)
-}
-
-func GetBlockHeightKey(height uint64) string {
-	return fmt.Sprintf("%s%020d", BlockHeightPrefix, height)
 }

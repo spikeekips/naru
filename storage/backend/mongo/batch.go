@@ -37,6 +37,10 @@ func (b *Batch) Close() error {
 	return b.Cancel()
 }
 
+func (b *Batch) Initialize() error {
+	return nil
+}
+
 func (b *Batch) Batch() storage.BatchStorage {
 	return b
 }

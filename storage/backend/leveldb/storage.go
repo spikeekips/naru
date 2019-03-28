@@ -1,9 +1,9 @@
 package leveldbstorage
 
 import (
+	"os"
 	"reflect"
 
-	"boscoin.io/sebak/lib/errors"
 	"github.com/syndtr/goleveldb/leveldb"
 	leveldbStorage "github.com/syndtr/goleveldb/leveldb/storage"
 	leveldbUtil "github.com/syndtr/goleveldb/leveldb/util"
@@ -13,7 +13,8 @@ import (
 )
 
 type Storage struct {
-	l *leveldb.DB
+	l    *leveldb.DB
+	path string
 }
 
 func NewStorage(c *config.LevelDBStorage) (*Storage, error) {
@@ -34,7 +35,7 @@ func NewStorage(c *config.LevelDBStorage) (*Storage, error) {
 		db = d
 	}
 
-	return &Storage{l: db}, nil
+	return &Storage{l: db, path: c.RealPath}, nil
 }
 
 func (b *Storage) Core() *leveldb.DB {
@@ -43,6 +44,14 @@ func (b *Storage) Core() *leveldb.DB {
 
 func (b *Storage) Close() error {
 	return b.l.Close()
+}
+
+func (b *Storage) Initialize() error {
+	if len(b.path) < 1 {
+		return nil
+	}
+
+	return os.RemoveAll(b.path)
 }
 
 func (b *Storage) Batch() storage.BatchStorage {
@@ -204,73 +213,6 @@ func (b *Storage) Delete(k string) error {
 	}
 
 	return setError(b.l.Delete(makeKey(k), nil))
-}
-
-func (b *Storage) MultipleInsert(items ...storage.Value) error {
-	if len(items) < 1 {
-		return setError(errors.New("empty values"))
-	}
-
-	for _, i := range items {
-		if err := b.MustNotExist(i.Key); err != nil {
-			return err
-		}
-	}
-
-	batch := new(leveldb.Batch)
-	for _, i := range items {
-		encoded, err := storage.Serialize(i.Value)
-		if err != nil {
-			return setError(err)
-		}
-
-		batch.Put(makeKey(i.Key), encoded)
-	}
-
-	return setError(b.l.Write(batch, nil))
-}
-
-func (b *Storage) MultipleUpdate(items ...storage.Value) error {
-	if len(items) < 1 {
-		return setError(errors.New("empty values"))
-	}
-
-	for _, i := range items {
-		if err := b.MustExist(i.Key); err != nil {
-			return err
-		}
-	}
-
-	batch := new(leveldb.Batch)
-	for _, i := range items {
-		encoded, err := storage.Serialize(i.Value)
-		if err != nil {
-			return setError(err)
-		}
-
-		batch.Put(makeKey(i.Key), encoded)
-	}
-
-	return setError(b.l.Write(batch, nil))
-}
-
-func (b *Storage) MultipleDelete(keys ...string) error {
-	if len(keys) < 1 {
-		return setError(errors.New("empty values"))
-	}
-
-	for _, i := range keys {
-		if err := b.MustExist(i); err != nil {
-			return err
-		}
-	}
-
-	batch := new(leveldb.Batch)
-	for _, i := range keys {
-		batch.Delete(makeKey(i))
-	}
-
-	return setError(b.l.Write(batch, nil))
 }
 
 func (b *Storage) Event(event string, values ...interface{}) {

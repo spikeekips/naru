@@ -1,4 +1,4 @@
-package mongoitem
+package mongoelement
 
 import (
 	"context"
@@ -7,64 +7,64 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/spikeekips/naru/element"
 	"github.com/spikeekips/naru/storage"
 	mongostorage "github.com/spikeekips/naru/storage/backend/mongo"
-	"github.com/spikeekips/naru/storage/item"
 )
 
-type Getter struct {
+type Potion struct {
 	s *mongostorage.Storage
 }
 
-func NewGetter(s *mongostorage.Storage) Getter {
-	return Getter{s: s}
+func NewPotion(s *mongostorage.Storage) Potion {
+	return Potion{s: s}
 }
 
-func (g Getter) Storage() storage.Storage {
+func (g Potion) Storage() storage.Storage {
 	return g.s
 }
 
-func (g Getter) Account(address string) (item.Account, error) {
-	var ac item.Account
-	err := g.s.Get(item.GetAccountKey(address), &ac)
+func (g Potion) Account(address string) (element.Account, error) {
+	var ac element.Account
+	err := g.s.Get(element.GetAccountKey(address), &ac)
 	return ac, err
 }
 
-func (g Getter) Block(hash string) (item.Block, error) {
-	var block item.Block
-	if err := g.s.Get(item.GetBlockKey(hash), &block); err != nil {
-		return item.Block{}, err
+func (g Potion) Block(hash string) (element.Block, error) {
+	var block element.Block
+	if err := g.s.Get(element.GetBlockKey(hash), &block); err != nil {
+		return element.Block{}, err
 	}
 
 	return block, nil
 }
 
-func (g Getter) BlockByHeight(height uint64) (item.Block, error) {
-	col, err := g.s.Collection(item.BlockPrefix)
+func (g Potion) BlockByHeight(height uint64) (element.Block, error) {
+	col, err := g.s.Collection(element.BlockPrefix)
 	if err != nil {
-		return item.Block{}, err
+		return element.Block{}, err
 	}
 
 	r := col.FindOne(context.Background(), bson.M{mongostorage.DocField("block.header.height"): height})
 	if err := r.Err(); err != nil {
-		return item.Block{}, err
+		return element.Block{}, err
 	}
 
 	raw, err := r.DecodeBytes()
 	if err != nil {
-		return item.Block{}, err
+		return element.Block{}, err
 	}
 
-	var block item.Block
+	var block element.Block
 	_, err = mongostorage.UnmarshalDocument(raw, &block)
 
 	return block, err
 }
 
-func (g Getter) LastBlock() (item.Block, error) {
-	col, err := g.s.Collection(item.BlockPrefix)
+func (g Potion) LastBlock() (element.Block, error) {
+	col, err := g.s.Collection(element.BlockPrefix)
 	if err != nil {
-		return item.Block{}, err
+		return element.Block{}, err
 	}
 
 	cur, err := col.Find(
@@ -75,48 +75,48 @@ func (g Getter) LastBlock() (item.Block, error) {
 			SetLimit(1),
 	)
 	if err != nil {
-		return item.Block{}, err
+		return element.Block{}, err
 	}
 	defer cur.Close(context.Background())
 
 	if !cur.Next(context.Background()) {
-		return item.Block{}, err
+		return element.Block{}, err
 	}
 	if err := cur.Err(); err != nil {
-		return item.Block{}, err
+		return element.Block{}, err
 	}
 
-	var block item.Block
+	var block element.Block
 	_, err = mongostorage.UnmarshalDocument([]byte(cur.Current), &block)
 	if err != nil {
-		return item.Block{}, err
+		return element.Block{}, err
 	}
 
 	return block, err
 }
 
-func (g Getter) BlocksIterator(
+func (g Potion) BlocksIterator(
 	iterFunc func() (sebakstorage.IterItem, bool),
 	closeFunc func(),
 ) (
-	func() (item.Block, bool, []byte),
+	func() (element.Block, bool, []byte),
 	func(),
 ) {
 
-	return (func() (item.Block, bool, []byte) {
+	return (func() (element.Block, bool, []byte) {
 			it, hasNext := iterFunc()
 			if !hasNext {
-				return item.Block{}, false, []byte{}
+				return element.Block{}, false, []byte{}
 			}
 
 			var hash string
 			if err := storage.Deserialize(it.Value, &hash); err != nil {
-				return item.Block{}, false, []byte{}
+				return element.Block{}, false, []byte{}
 			}
 
 			b, err := g.Block(hash)
 			if err != nil {
-				return item.Block{}, false, []byte{}
+				return element.Block{}, false, []byte{}
 			}
 
 			return b, hasNext, it.Key
@@ -125,21 +125,21 @@ func (g Getter) BlocksIterator(
 		})
 }
 
-func (g Getter) Operation(hash string) (op item.Operation, err error) {
-	err = g.s.Get(item.GetOperationKey(hash), &op)
+func (g Potion) Operation(hash string) (op element.Operation, err error) {
+	err = g.s.Get(element.GetOperationKey(hash), &op)
 	return
 }
 
-func (g Getter) OperationsByAccount(address string, options storage.ListOptions) (
-	func() (item.Operation, bool, []byte),
+func (g Potion) OperationsByAccount(address string, options storage.ListOptions) (
+	func() (element.Operation, bool, []byte),
 	func(),
 ) {
-	nullIterFunc := func() (item.Operation, bool, []byte) {
-		return item.Operation{}, false, nil
+	nullIterFunc := func() (element.Operation, bool, []byte) {
+		return element.Operation{}, false, nil
 	}
 	nullCloseFunc := func() {}
 
-	col, err := g.s.Collection(item.OperationPrefix)
+	col, err := g.s.Collection(element.OperationPrefix)
 	if err != nil {
 		return nullIterFunc, nullCloseFunc
 	}
@@ -181,15 +181,15 @@ func (g Getter) OperationsByAccount(address string, options storage.ListOptions)
 	}
 	defer cur.Close(context.Background())
 
-	return func() (item.Operation, bool, []byte) {
+	return func() (element.Operation, bool, []byte) {
 			next := cur.Next(context.Background())
 			if !next {
 				defer cur.Close(context.Background())
-				return item.Operation{}, false, nil
+				return element.Operation{}, false, nil
 			}
 
 			b := []byte(cur.Current)
-			var operation item.Operation
+			var operation element.Operation
 			_, err = mongostorage.UnmarshalDocument(b, &operation)
 			return operation, true, b
 		},
@@ -198,11 +198,11 @@ func (g Getter) OperationsByAccount(address string, options storage.ListOptions)
 		}
 }
 
-func (g Getter) ExistsTransaction(hash string) (bool, error) {
-	return g.s.Has(item.GetTransactionKey(hash))
+func (g Potion) ExistsTransaction(hash string) (bool, error) {
+	return g.s.Has(element.GetTransactionKey(hash))
 }
 
-func (g Getter) Transaction(hash string) (tx item.Transaction, err error) {
-	err = g.s.Get(item.GetTransactionKey(hash), &tx)
+func (g Potion) Transaction(hash string) (tx element.Transaction, err error) {
+	err = g.s.Get(element.GetTransactionKey(hash), &tx)
 	return
 }

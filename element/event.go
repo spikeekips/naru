@@ -1,4 +1,4 @@
-package item
+package element
 
 const (
 	EventOnAfterSaveBlock       string = "OnAfterSaveBlock"

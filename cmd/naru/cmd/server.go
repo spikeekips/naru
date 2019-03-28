@@ -14,9 +14,9 @@ import (
 	cachebackend "github.com/spikeekips/naru/cache/backend"
 	"github.com/spikeekips/naru/config"
 	"github.com/spikeekips/naru/digest"
+	"github.com/spikeekips/naru/element"
 	"github.com/spikeekips/naru/sebak"
 	"github.com/spikeekips/naru/storage"
-	"github.com/spikeekips/naru/storage/item"
 )
 
 var (
@@ -90,29 +90,27 @@ func runServer(sc *ServerConfig) error {
 		return err
 	}
 
-	getter := NewGetterByStorage(st)
+	potion := NewPotionByStorage(st)
 
-	/* TODO
 	if sc.Digest.Init {
-		if err = os.RemoveAll(sc.Storage.LevelDB.Path); err != nil {
-			log.Crit("failed to remove storage", "directory", sc.Storage.LevelDB.Path, "error", err)
+		if err = st.Initialize(); err != nil {
+			log.Crit("failed to remove storage", "storage", sc.Storage, "error", err)
 			return err
 		}
 	}
-	*/
 
-	storage.Observer.On(item.EventOnAfterSaveBlock, func(v ...interface{}) {
+	storage.Observer.On(element.EventOnAfterSaveBlock, func(v ...interface{}) {
 		fmt.Println("> new block triggered", v)
 	})
 
-	storage.Observer.On(item.EventOnAfterSaveAccount, func(v ...interface{}) {
+	storage.Observer.On(element.EventOnAfterSaveAccount, func(v ...interface{}) {
 		fmt.Println("> account saved triggered", v)
 	})
 
 	provider := sebak.NewJSONRPCStorageProvider(sc.SEBAK.JSONRpc)
 	sst := sebak.NewStorage(provider)
 
-	runner := digest.NewInitializeDigestRunner(sst, getter, nodeInfo)
+	runner := digest.NewInitializeDigestRunner(sst, potion, nodeInfo)
 	if sc.Digest.RemoteBlock > 0 {
 		runner.TestLastRemoteBlock = sc.Digest.RemoteBlock
 	}
@@ -120,7 +118,7 @@ func runServer(sc *ServerConfig) error {
 		return err
 	}
 
-	watchRunner := digest.NewWatchDigestRunner(sst, getter, nodeInfo, runner.StoredRemoteBlock().Height+1)
+	watchRunner := digest.NewWatchDigestRunner(sst, potion, nodeInfo, runner.StoredRemoteBlock().Height+1)
 	watchRunner.SetInterval(sc.Digest.WatchInterval)
 	go func() {
 		if err := watchRunner.Run(false); err != nil {
@@ -131,7 +129,7 @@ func runServer(sc *ServerConfig) error {
 	// start network layers
 	cb := cachebackend.NewGoCache()
 
-	restServer := restv1.NewServer(sc.Network, sst, getter, cb, nodeInfo)
+	restServer := restv1.NewServer(sc.Network, sst, potion, cb, nodeInfo)
 	if sc.System.Profile {
 		restServer.AddHandler("/debug/pprof/", pprof.Index)
 		restServer.AddHandler("/debug/pprof/cmdline", pprof.Cmdline)

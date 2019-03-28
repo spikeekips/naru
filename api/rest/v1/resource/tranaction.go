@@ -7,14 +7,14 @@ import (
 
 	sebakresource "boscoin.io/sebak/lib/node/runner/api/resource"
 
-	"github.com/spikeekips/naru/storage/item"
+	"github.com/spikeekips/naru/element"
 )
 
 type Transaction struct {
-	tx item.Transaction
+	tx element.Transaction
 }
 
-func NewTransaction(tx item.Transaction) *Transaction {
+func NewTransaction(tx element.Transaction) *Transaction {
 	t := &Transaction{
 		tx: tx,
 	}

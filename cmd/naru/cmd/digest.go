@@ -77,26 +77,24 @@ func runDigest(dc *digestConfig) error {
 	}
 	log.Debug("sebak nodeinfo", "nodeinfo", nodeInfo)
 
-	/* TODO
-	if dc.Digest.Init {
-		if err = os.RemoveAll(dc.Storage.LevelDB.Path); err != nil {
-			log.Crit("failed to remove storage", "directory", dc.Storage.LevelDB.Path, "error", err)
-			return err
-		}
-	}
-	*/
-
 	st, err := NewStorageByConfig(dc.Storage)
 	if err != nil {
 		return err
 	}
 
-	getter := NewGetterByStorage(st)
+	if dc.Digest.Init {
+		if err = st.Initialize(); err != nil {
+			log.Crit("failed to remove storage", "storage", dc.Storage, "error", err)
+			return err
+		}
+	}
+
+	potion := NewPotionByStorage(st)
 
 	provider := sebak.NewJSONRPCStorageProvider(dc.SEBAK.JSONRpc)
 	sst := sebak.NewStorage(provider)
 
-	runner := digest.NewInitializeDigestRunner(sst, getter, nodeInfo)
+	runner := digest.NewInitializeDigestRunner(sst, potion, nodeInfo)
 	if dc.Digest.RemoteBlock > 0 {
 		runner.TestLastRemoteBlock = dc.Digest.RemoteBlock
 	}
@@ -105,7 +103,7 @@ func runDigest(dc *digestConfig) error {
 	}
 
 	if dc.Digest.Watch {
-		watchRunner := digest.NewWatchDigestRunner(sst, getter, nodeInfo, runner.StoredRemoteBlock().Height+1)
+		watchRunner := digest.NewWatchDigestRunner(sst, potion, nodeInfo, runner.StoredRemoteBlock().Height+1)
 		watchRunner.SetInterval(dc.Digest.WatchInterval)
 		if err = watchRunner.Run(true); err != nil {
 			return err
