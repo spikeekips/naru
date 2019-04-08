@@ -4,8 +4,9 @@ import (
 	"runtime/debug"
 	"testing"
 
-	"github.com/spikeekips/naru/common"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/spikeekips/naru/common"
 )
 
 type testLevelDBItemEvent struct {

@@ -1,9 +1,8 @@
 package restv1
 
 import (
-	"github.com/gorilla/mux"
-
 	sebakapi "boscoin.io/sebak/lib/node/runner/api"
+	"github.com/gorilla/mux"
 
 	"github.com/spikeekips/naru/element"
 	"github.com/spikeekips/naru/storage"

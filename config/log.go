@@ -179,19 +179,28 @@ type Logs struct {
 
 type PackageLog struct {
 	cvc.BaseGroup
-	Config  *LogConfig
-	Common  *LogConfig
-	Digest  *LogConfig
-	Restv1  *LogConfig
-	Storage *LogConfig
-	SEBAK   *LogConfig
-	Query   *LogConfig
+	Config         *LogConfig
+	Common         *LogConfig
+	Digest         *LogConfig
+	Restv1         *LogConfig
+	Storage        *LogConfig
+	StorageBackend *LogConfig
+	SEBAK          *LogConfig
+	Query          *LogConfig
 }
 
 func NewLogs() *Logs {
 	return &Logs{
 		Global:  NewLog(),
-		Package: &PackageLog{},
+		Package: NewPackageLog(),
+	}
+}
+
+func NewPackageLog() *PackageLog {
+	return &PackageLog{
+		StorageBackend: &LogConfig{
+			LevelString: "error",
+		},
 	}
 }
 
@@ -205,6 +214,7 @@ func (l *Logs) Merge() error {
 	l.Package.Digest.Combine(l.Global)
 	l.Package.Restv1.Combine(l.Global)
 	l.Package.Storage.Combine(l.Global)
+	l.Package.StorageBackend.Combine(l.Global)
 	l.Package.SEBAK.Combine(l.Global)
 	l.Package.Query.Combine(l.Global)
 

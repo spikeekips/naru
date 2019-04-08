@@ -18,11 +18,11 @@ type Batch struct {
 	events []common.EventItem
 }
 
-func NewBatch(s *Storage) *Batch {
+func NewBatch(s *Storage) (*Batch, error) {
 	return &Batch{
 		s: s,
 		b: new(leveldb.Batch),
-	}
+	}, nil
 }
 
 func (b *Batch) Initialize() error {
@@ -153,6 +153,8 @@ func (b *Batch) MultipleDelete(keys ...string) error {
 }
 
 func (b *Batch) Write() error {
+	defer b.Close()
+
 	var events []common.EventItem
 	{
 		b.RLock()
@@ -190,24 +192,22 @@ func (b *Batch) Write() error {
 		storage.Observer.Trigger(strings.Join(events, " "), e.Items...)
 	}
 
-	b.clearEvents()
 	return nil
 }
 
 func (b *Batch) Cancel() error {
-	defer b.clearEvents()
-
-	b.b = new(leveldb.Batch)
-	return nil
+	return b.Close()
 }
 
 func (b *Batch) Close() error {
-	b.Cancel()
-	return b.s.Close()
+	b.clearEvents()
+	b.b = new(leveldb.Batch)
+
+	return nil
 }
 
-func (b *Batch) Batch() storage.BatchStorage {
-	return b
+func (b *Batch) Batch() (storage.BatchStorage, error) {
+	return b, nil
 }
 
 func (b *Batch) Event(event string, values ...interface{}) {

@@ -15,18 +15,25 @@ import (
 
 type Batch struct {
 	sync.RWMutex
-	s      *Storage
-	ops    map[string][]mongo.WriteModel
-	events []common.EventItem
-	log    logging.Logger
+	s          *Storage
+	ops        map[string][]mongo.WriteModel
+	events     []common.EventItem
+	log        logging.Logger
+	skipExists bool
 }
 
-func NewBatch(s *Storage) *Batch {
-	return &Batch{
-		s:   s,
-		log: log.New(logging.Ctx{"name": "batch"}),
-		ops: map[string][]mongo.WriteModel{},
+func NewBatch(s *Storage, skipExists bool) (*Batch, error) {
+	ns, err := s.New()
+	if err != nil {
+		return nil, err
 	}
+
+	return &Batch{
+		s:          ns,
+		log:        log.New(logging.Ctx{"name": "batch"}),
+		ops:        map[string][]mongo.WriteModel{},
+		skipExists: skipExists,
+	}, nil
 }
 
 func (b *Batch) Core() *mongo.Client {
@@ -34,18 +41,34 @@ func (b *Batch) Core() *mongo.Client {
 }
 
 func (b *Batch) Close() error {
-	return b.Cancel()
+	b.clearEvents()
+
+	b.Lock()
+	b.ops = map[string][]mongo.WriteModel{}
+	b.Unlock()
+
+	return b.s.Close()
 }
 
 func (b *Batch) Initialize() error {
 	return nil
 }
 
-func (b *Batch) Batch() storage.BatchStorage {
-	return b
+func (b *Batch) Batch() (storage.BatchStorage, error) {
+	return b, nil
 }
 
-func (b *Batch) Write() error {
+func (b *Batch) Write() (err error) {
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		b.log.Error("failed to BulkWrite", "error", err)
+	}()
+
+	defer b.Close()
+
 	var events []common.EventItem
 	{
 		b.RLock()
@@ -74,11 +97,12 @@ func (b *Batch) Write() error {
 	}
 	b.RUnlock()
 
+	var result *mongo.BulkWriteResult
 	for k, v := range ops {
 		col := b.s.Database().Collection(k)
-		result, err := col.BulkWrite(context.Background(), v)
+		result, err = col.BulkWrite(context.Background(), v)
 		if err != nil {
-			return err
+			return
 		}
 
 		b.log.Debug(
@@ -105,18 +129,11 @@ func (b *Batch) Write() error {
 		storage.Observer.Trigger(strings.Join(events, " "), e.Items...)
 	}
 
-	b.clearEvents()
-	return nil
+	return
 }
 
 func (b *Batch) Cancel() error {
-	defer b.clearEvents()
-
-	b.Lock()
-	b.ops = map[string][]mongo.WriteModel{}
-	b.Unlock()
-
-	return nil
+	return b.Close()
 }
 
 func (b *Batch) Has(k string) (bool, error) {
@@ -140,39 +157,44 @@ func (b *Batch) Iterator(prefix string, v interface{}, options storage.ListOptio
 }
 
 func (b *Batch) Insert(k string, v interface{}) error {
-	if err := b.MustNotExist(k); err != nil {
-		return err
+	if !b.skipExists {
+		if err := b.MustNotExist(k); err != nil {
+			return err
+		}
 	}
 
 	return b.insert(k, v)
 }
 
 func (b *Batch) insert(k string, v interface{}) error {
-	b.Lock()
-	defer b.Unlock()
-
 	c, err := getCollection(k)
 	if err != nil {
 		return err
 	}
 
+	b.Lock()
 	if _, ok := b.ops[c]; !ok {
 		b.ops[c] = []mongo.WriteModel{}
 	}
+	b.Unlock()
 
 	doc, err := NewDocument(k, v)
 	if err != nil {
 		return err
 	}
 
+	b.Lock()
 	b.ops[c] = append(b.ops[c], mongo.NewInsertOneModel().SetDocument(doc))
+	b.Unlock()
 
 	return nil
 }
 
 func (b *Batch) Update(k string, v interface{}) error {
-	if err := b.MustExist(k); err != nil {
-		return err
+	if !b.skipExists {
+		if err := b.MustExist(k); err != nil {
+			return err
+		}
 	}
 
 	if err := b.delete(k); err != nil {
@@ -185,22 +207,23 @@ func (b *Batch) Update(k string, v interface{}) error {
 }
 
 func (b *Batch) Delete(k string) error {
-	if err := b.MustExist(k); err != nil {
-		return err
+	if !b.skipExists {
+		if err := b.MustExist(k); err != nil {
+			return err
+		}
 	}
 
 	return b.delete(k)
 }
 
 func (b *Batch) delete(k string) error {
-	b.Lock()
-	defer b.Unlock()
-
 	c, err := getCollection(k)
 	if err != nil {
 		return err
 	}
 
+	b.Lock()
+	defer b.Unlock()
 	if _, ok := b.ops[c]; !ok {
 		b.ops[c] = []mongo.WriteModel{}
 	}

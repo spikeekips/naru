@@ -22,6 +22,7 @@ type Operation struct {
 	Height     uint64                       `json:"block_height"`
 	SequenceID uint64                       `json:"sequence_id"`
 	Linked     string                       `json:"linked"`
+	Amount     sebakcommon.Amount           `json:"amount"`
 	Raw        []byte                       `json:"raw"`
 }
 
@@ -32,6 +33,11 @@ func NewOperation(op sebakoperation.Operation, tx sebaktransaction.Transaction, 
 	target := ""
 	if pop, ok := op.B.(sebakoperation.Targetable); ok {
 		target = pop.TargetAddress()
+	}
+
+	amount := sebakcommon.Amount(0)
+	if payable, ok := op.B.(sebakoperation.Payable); ok {
+		amount = payable.GetAmount()
 	}
 
 	linked := ""
@@ -55,6 +61,7 @@ func NewOperation(op sebakoperation.Operation, tx sebaktransaction.Transaction, 
 		Height:     blockHeight,
 		SequenceID: tx.B.SequenceID,
 		Linked:     linked,
+		Amount:     amount,
 		Raw:        raw,
 	}, nil
 }

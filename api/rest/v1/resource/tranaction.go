@@ -3,9 +3,8 @@ package resourcev1
 import (
 	"strings"
 
-	"github.com/nvellon/hal"
-
 	sebakresource "boscoin.io/sebak/lib/node/runner/api/resource"
+	"github.com/nvellon/hal"
 
 	"github.com/spikeekips/naru/element"
 )

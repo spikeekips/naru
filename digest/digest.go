@@ -4,19 +4,14 @@ import (
 	"fmt"
 	"time"
 
-	logging "github.com/inconshreveable/log15"
-
 	sebakcommon "boscoin.io/sebak/lib/common"
 	sebakerrors "boscoin.io/sebak/lib/errors"
-	sebakrunner "boscoin.io/sebak/lib/node/runner"
-	sebakstorage "boscoin.io/sebak/lib/storage"
+	logging "github.com/inconshreveable/log15"
 
 	"github.com/spikeekips/naru/element"
 	"github.com/spikeekips/naru/sebak"
 	"github.com/spikeekips/naru/storage"
 )
-
-var maxNumberOfWorkers int = 100
 
 type Digest struct {
 	sst           *sebak.Storage
@@ -26,9 +21,10 @@ type Digest struct {
 	start         uint64
 	end           uint64
 	initialize    bool
+	maxWorkers    int
 }
 
-func NewDigest(sst *sebak.Storage, potion element.Potion, genesisSource string, start, end uint64, initialize bool) (*Digest, error) {
+func NewDigest(sst *sebak.Storage, potion element.Potion, genesisSource string, start, end uint64, initialize bool, maxWorkers int, blocksLimit uint64) (*Digest, error) {
 	if start > end {
 		return nil, fmt.Errorf("invalid start and end range: %d - %d", start, end)
 	}
@@ -39,8 +35,9 @@ func NewDigest(sst *sebak.Storage, potion element.Potion, genesisSource string, 
 		genesisSource: genesisSource,
 		start:         start,
 		end:           end,
-		blocksLimit:   sebakrunner.MaxLimitListOptions,
 		initialize:    initialize,
+		maxWorkers:    maxWorkers,
+		blocksLimit:   blocksLimit,
 	}, nil
 }
 
@@ -80,17 +77,17 @@ func (d *Digest) Digest() error {
 	numberOfWorkers := int((d.end - d.start) / d.blocksLimit)
 	if numberOfWorkers < 1 {
 		numberOfWorkers = 1
-	} else if numberOfWorkers > maxNumberOfWorkers {
-		numberOfWorkers = maxNumberOfWorkers
+	} else if numberOfWorkers > d.maxWorkers {
+		numberOfWorkers = d.maxWorkers
 	}
 
 	started := time.Now()
 	log_ := log.New(logging.Ctx{
-		"start":              d.start,
-		"end":                d.end,
-		"blocksLimit":        d.blocksLimit,
-		"numberOfWorkers":    numberOfWorkers,
-		"maxNumberOfWorkers": maxNumberOfWorkers,
+		"start":           d.start,
+		"end":             d.end,
+		"blocksLimit":     d.blocksLimit,
+		"numberOfWorkers": numberOfWorkers,
+		"maxWorkers":      d.maxWorkers,
 	})
 
 	log_.Debug("start digest")
@@ -114,7 +111,6 @@ func (d *Digest) Digest() error {
 			end = d.end
 		}
 
-		log_.Debug("cursor", "start", start, "end", end)
 		cursorSet = append(cursorSet, [2]uint64{start, end})
 		start += d.blocksLimit
 		countCursors += 1
@@ -122,7 +118,6 @@ func (d *Digest) Digest() error {
 
 	go func() {
 		for _, cursors := range cursorSet {
-			log_.Debug("cursors", "start", cursors[0], "end", cursors[1])
 			chanWorker <- cursors
 		}
 		close(chanWorker)
@@ -151,7 +146,12 @@ end:
 	}
 
 	if d.initialize {
-		if err := d.saveAccounts(d.potion.Storage()); err != nil {
+		batch, err := d.newBatch()
+		if err != nil {
+			return err
+		}
+
+		if err := d.saveAccounts(batch); err != nil {
 			return err
 		}
 	}
@@ -178,6 +178,7 @@ func (d *Digest) digestBlocks(wid int, chanWorker <-chan [2]uint64, chanError ch
 }
 
 func (d *Digest) digestBlocksByHeight(start, end uint64) error {
+	started := time.Now()
 	log_ := log.New(logging.Ctx{
 		"start": start,
 		"end":   end,
@@ -191,7 +192,7 @@ func (d *Digest) digestBlocksByHeight(start, end uint64) error {
 		cursor = []byte(sebak.BlockHeightKey(start))
 	}
 
-	options := sebakstorage.NewDefaultListOptions(
+	options := storage.NewDefaultListOptions(
 		false,
 		cursor,
 		d.blocksLimit,
@@ -199,8 +200,7 @@ func (d *Digest) digestBlocksByHeight(start, end uint64) error {
 	iterFunc, closeFunc := sebak.GetBlocks(d.sst, options)
 	defer closeFunc()
 
-	var block element.Block
-	var n int
+	var blocks []element.Block
 	for {
 		blk, hasNext := iterFunc()
 		if !hasNext {
@@ -210,19 +210,55 @@ func (d *Digest) digestBlocksByHeight(start, end uint64) error {
 			break
 		}
 
-		block = element.NewBlock(blk)
-		if err := d.digestBlock(block); err != nil {
+		blocks = append(blocks, element.NewBlock(blk))
+	}
+	log_.Debug(
+		"block fetched",
+		"blocks", len(blocks),
+		"fetch-elapsed", time.Now().Sub(started),
+		"elapsed", time.Now().Sub(started),
+	)
+
+	digestStarted := time.Now()
+	batch, err := d.newBatch()
+	if err != nil {
+		return err
+	}
+	defer batch.Close()
+
+	var block element.Block
+	for _, block = range blocks {
+		if err := d.digestBlock(batch, block); err != nil {
 			return err
 		}
-
-		n += 1
+		time.Sleep(time.Millisecond * 300)
 	}
-	log_.Debug("block digested to end", "height", block.Height, "count", n)
+
+	log_.Debug(
+		"block digested",
+		"last-block", block.Height,
+		"blocks", len(blocks),
+		"elapsed", time.Now().Sub(started),
+		"digest-elapsed", time.Now().Sub(digestStarted),
+	)
+
+	writeStarted := time.Now()
+	if err := batch.Write(); err != nil {
+		return err
+	}
+
+	log_.Debug(
+		"blocks saved",
+		"last-block", block.Height,
+		"blocks", len(blocks),
+		"elapsed", time.Now().Sub(started),
+		"write-elapsed", time.Now().Sub(writeStarted),
+	)
 
 	return nil
 }
 
-func (d *Digest) digestBlock(block element.Block) (err error) {
+func (d *Digest) digestBlock(st storage.Storage, block element.Block) error {
 	var txHashes []string
 	txHashes = append(txHashes, block.Transactions...)
 	txHashes = append(txHashes, block.ProposerTransaction)
@@ -230,29 +266,21 @@ func (d *Digest) digestBlock(block element.Block) (err error) {
 	txs, err := sebak.GetTransactions(d.sst, txHashes...)
 	if err != nil {
 		log.Error("failed to get transactions from block", "block", block.Height, "error", err)
-		return
-	}
-
-	st := d.potion.Storage().Batch()
-	if err != nil {
 		return err
 	}
 
-	if err = d.saveBlock(st, block, txs); err != nil {
+	err = d.saveBlock(st, block, txs)
+	if err != nil {
 		if err == sebakerrors.BlockAlreadyExists {
 			log.Warn("block already exists", "block", block.Height)
+			return nil
 		} else {
 			log.Error("failed to save block and transactions", "block", block.Height, "error", err)
-			st.Cancel()
-			return
+			return err
 		}
 	}
 
-	if err = st.Write(); err == nil {
-		log.Debug("block saved", "block", block.Height, "txs", len(txHashes))
-	}
-
-	return err
+	return nil
 }
 
 func (d *Digest) logInsertedData() {
@@ -305,7 +333,6 @@ func (d *Digest) logInsertedData() {
 			}
 			transactions += 1
 		}
-
 	}
 
 	{ // accounts
@@ -322,7 +349,6 @@ func (d *Digest) logInsertedData() {
 			}
 			accounts += 1
 		}
-
 	}
 
 	log.Debug(
@@ -337,7 +363,7 @@ func (d *Digest) logInsertedData() {
 func (d *Digest) saveAccounts(st storage.Storage, addresses ...string) error {
 	var count int
 	if len(addresses) < 1 {
-		options := sebakstorage.NewDefaultListOptions(false, nil, 0)
+		options := storage.NewDefaultListOptions(false, nil, 0)
 		iterFunc, closeFunc := sebak.GetAccounts(d.sst, options)
 		defer closeFunc()
 
@@ -349,7 +375,6 @@ func (d *Digest) saveAccounts(st storage.Storage, addresses ...string) error {
 			if err := ac.Save(st); err != nil {
 				return err
 			}
-			log.Debug("save account", "account", ac)
 
 			count += 1
 		}
@@ -370,7 +395,7 @@ func (d *Digest) saveAccounts(st storage.Storage, addresses ...string) error {
 		}
 	}
 
-	log.Debug("save accounts", "count", count)
+	log.Debug("accounts saved", "count", count)
 
 	return nil
 }
@@ -383,7 +408,6 @@ func (d *Digest) saveBlock(st storage.Storage, block element.Block, txs []elemen
 			log.Error("failed to save transaction", "tx", tx.Hash, "error", err)
 			return err
 		}
-		log.Debug("save transaction", "tx", txm)
 		if !d.initialize {
 			addresses = append(addresses, tx.AllAccounts()...)
 		}
@@ -393,7 +417,6 @@ func (d *Digest) saveBlock(st storage.Storage, block element.Block, txs []elemen
 		return err
 	}
 
-	log.Debug("save block", "block", block)
 	if !d.initialize {
 		if err := d.saveAccounts(st, addresses...); err != nil {
 			log.Error("failed to save accounts", "block", block.Height, "error", err, "txs", txs)
@@ -402,4 +425,19 @@ func (d *Digest) saveBlock(st storage.Storage, block element.Block, txs []elemen
 	}
 
 	return nil
+}
+
+func (d *Digest) newBatch() (storage.BatchStorage, error) {
+	var batch storage.BatchStorage
+	var err error
+
+	for i := 0; i < 10; i++ {
+		if batch, err = d.potion.Storage().Batch(); err == nil {
+			return batch, nil
+		}
+		log.Warn("failed to create batch", "error", err, "t", i)
+		time.Sleep(time.Second * time.Duration(i+1))
+	}
+
+	return nil, err
 }

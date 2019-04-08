@@ -54,7 +54,7 @@ func (b *Storage) Initialize() error {
 	return os.RemoveAll(b.path)
 }
 
-func (b *Storage) Batch() storage.BatchStorage {
+func (b *Storage) Batch() (storage.BatchStorage, error) {
 	return NewBatch(b)
 }
 
@@ -96,12 +96,16 @@ func (b *Storage) MustNotExist(k string) error {
 	return nil
 }
 
-func (b *Storage) Get(k string, v interface{}) error {
+func (b *Storage) GetRaw(k string) ([]byte, error) {
 	if err := b.MustExist(k); err != nil {
-		return err
+		return nil, err
 	}
 
-	o, err := b.l.Get(makeKey(k), nil)
+	return b.l.Get(makeKey(k), nil)
+}
+
+func (b *Storage) Get(k string, v interface{}) error {
+	o, err := b.GetRaw(k)
 	if err != nil {
 		return setError(err)
 	}
@@ -109,7 +113,7 @@ func (b *Storage) Get(k string, v interface{}) error {
 	return storage.Deserialize(o, v)
 }
 
-func (b *Storage) Iterator(prefix string, v interface{}, options storage.ListOptions) (func() (storage.Record, bool), func()) {
+func (b *Storage) IteratorRaw(prefix string, options storage.ListOptions) (func() (storage.IterItem, bool), func()) {
 	var reverse = false
 	var cursor []byte
 	var limit uint64 = 0
@@ -152,33 +156,47 @@ func (b *Storage) Iterator(prefix string, v interface{}, options storage.ListOpt
 	}
 
 	var n uint64 = 0
-	return func() (storage.Record, bool) {
-			var exists bool
+	return func() (storage.IterItem, bool) {
+			var next bool
 			if n == 0 {
-				exists = seek()
+				next = seek()
 			} else {
-				exists = funcNext()
-			}
-
-			nv := reflect.New(reflect.TypeOf(v)).Interface()
-			if err := storage.Deserialize(iter.Value(), nv); err != nil {
-				return storage.Record{}, false
+				next = funcNext()
 			}
 
 			n++
 
 			if limit != 0 && n > limit {
-				exists = false
+				iter.Release()
+				return storage.IterItem{}, false
 			}
 
-			return storage.NewRecord(
-				string(iter.Key()),
-				reflect.ValueOf(nv).Elem().Interface(),
-			), exists
+			return storage.NewIterItemFromIterator(iter), next
 		},
 		func() {
 			iter.Release()
 		}
+}
+
+func (b *Storage) Iterator(prefix string, v interface{}, options storage.ListOptions) (func() (storage.Record, bool), func()) {
+	iterFunc, closeFunc := b.IteratorRaw(prefix, options)
+	return func() (storage.Record, bool) {
+			item, next := iterFunc()
+			if !next {
+				return storage.Record{}, false
+			}
+
+			nv := reflect.New(reflect.TypeOf(v)).Interface()
+			if err := storage.Deserialize(item.Value, nv); err != nil {
+				return storage.Record{}, false
+			}
+
+			return storage.NewRecord(
+				string(item.Key),
+				reflect.ValueOf(nv).Elem().Interface(),
+			), next
+		},
+		closeFunc
 }
 
 func (b *Storage) Insert(k string, v interface{}) error {

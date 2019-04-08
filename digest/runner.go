@@ -25,6 +25,8 @@ type BaseDigestRunner struct {
 	storedRemoteBlock   sebakblock.Block
 	lastLocalBlock      element.Block
 	TestLastRemoteBlock uint64
+	MaxWorkers          int
+	Blocks              uint64
 }
 
 func (d *BaseDigestRunner) GenesisSource() string {
@@ -65,12 +67,14 @@ type InitializeDigestRunner struct {
 	initialize bool
 }
 
-func NewInitializeDigestRunner(sst *sebak.Storage, potion element.Potion, sebakInfo sebaknode.NodeInfo) *InitializeDigestRunner {
+func NewInitializeDigestRunner(sst *sebak.Storage, potion element.Potion, sebakInfo sebaknode.NodeInfo, maxWorkers int, blocks uint64) *InitializeDigestRunner {
 	return &InitializeDigestRunner{
 		BaseDigestRunner: &BaseDigestRunner{
-			sst:       sst,
-			potion:    potion,
-			sebakInfo: sebakInfo,
+			sst:        sst,
+			potion:     potion,
+			sebakInfo:  sebakInfo,
+			MaxWorkers: maxWorkers,
+			Blocks:     blocks,
 		},
 	}
 }
@@ -142,8 +146,10 @@ func (d *InitializeDigestRunner) Run() (err error) {
 		return nil
 	}
 
+	var start, end uint64 = d.LastLocalBlock().Height, lastRemoteBlock.Height
+
 	var dg *Digest
-	dg, err = NewDigest(d.sst, d.potion, d.GenesisSource(), d.LastLocalBlock().Height, lastRemoteBlock.Height, d.initialize)
+	dg, err = NewDigest(d.sst, d.potion, d.GenesisSource(), start, end, d.initialize, d.MaxWorkers, d.Blocks)
 	if err != nil {
 		log.Error("failed to open digest", "error", err)
 		return
@@ -161,6 +167,11 @@ func (d *InitializeDigestRunner) Run() (err error) {
 
 	d.setLastLocalBlock(element.NewBlock(lastRemoteBlock))
 
+	{
+		st := d.potion.Storage()
+		st.Event("OnAfterDigest", d.potion, start, end)
+	}
+
 	return nil
 }
 
@@ -170,12 +181,14 @@ type WatchDigestRunner struct {
 	interval time.Duration
 }
 
-func NewWatchDigestRunner(sst *sebak.Storage, potion element.Potion, sebakInfo sebaknode.NodeInfo, start uint64) *WatchDigestRunner {
+func NewWatchDigestRunner(sst *sebak.Storage, potion element.Potion, sebakInfo sebaknode.NodeInfo, start uint64, maxWorkers int, blocks uint64) *WatchDigestRunner {
 	return &WatchDigestRunner{
 		BaseDigestRunner: &BaseDigestRunner{
-			sst:       sst,
-			potion:    potion,
-			sebakInfo: sebakInfo,
+			sst:        sst,
+			potion:     potion,
+			sebakInfo:  sebakInfo,
+			MaxWorkers: maxWorkers,
+			Blocks:     blocks,
 		},
 		start: start,
 	}
@@ -264,7 +277,7 @@ func (w *WatchDigestRunner) Run(force bool) error {
 func (w *WatchDigestRunner) followup(start, end uint64) error {
 	log.Debug("start to follow up", "start", start, "end", end)
 
-	dg, err := NewDigest(w.sst, w.potion, w.GenesisSource(), start, end, false)
+	dg, err := NewDigest(w.sst, w.potion, w.GenesisSource(), start, end, false, w.MaxWorkers, w.Blocks)
 	if err != nil {
 		log.Error("failed to open digest", "error", err)
 		return err
@@ -326,7 +339,7 @@ func (w *WatchDigestRunner) watchLatestBlock(lastBlock uint64) error {
 		start = lastBlock
 	}
 
-	db, err := NewDigest(w.sst, w.potion, w.GenesisSource(), start, block.Height, false)
+	db, err := NewDigest(w.sst, w.potion, w.GenesisSource(), start, block.Height, false, w.MaxWorkers, w.Blocks)
 	if err != nil {
 		log.Error("failed to open digest", "error", err)
 		return err
@@ -345,6 +358,11 @@ func (w *WatchDigestRunner) watchLatestBlock(lastBlock uint64) error {
 
 	w.setStoredRemoteBlock(block)
 	w.setLastLocalBlock(element.NewBlock(block))
+
+	{
+		st := w.potion.Storage()
+		st.Event("OnAfterDigest", w.potion, start, block.Height)
+	}
 
 	return nil
 }

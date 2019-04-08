@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	sebakerrors "boscoin.io/sebak/lib/errors"
-	sebakstorage "boscoin.io/sebak/lib/storage"
 
 	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/element"
@@ -73,6 +72,15 @@ func (g Potion) Account(address string) (element.Account, error) {
 	return ac, err
 }
 
+func (g Potion) Accounts(sort string, options storage.ListOptions) (
+	func() (element.Account, bool, []byte),
+	func(),
+) {
+	return func() (element.Account, bool, []byte) {
+		return element.Account{}, false, nil
+	}, func() {}
+}
+
 func (g Potion) Block(hash string) (element.Block, error) {
 	var block element.Block
 	if err := g.s.Get(element.GetBlockKey(hash), &block); err != nil {
@@ -108,13 +116,15 @@ func (g Potion) LastBlock() (element.Block, error) {
 	return g.Block(hash)
 }
 
-func (g Potion) BlocksIterator(
-	iterFunc func() (sebakstorage.IterItem, bool),
-	closeFunc func(),
-) (
+func (g Potion) BlocksByHeight(start, end uint64) (
 	func() (element.Block, bool, []byte),
 	func(),
 ) {
+	iterFunc, closeFunc := g.Storage().Iterator(
+		BlockHeightPrefix,
+		"",
+		storage.NewDefaultListOptions(false, []byte(GetBlockHeightKey(start)), 0),
+	)
 
 	return (func() (element.Block, bool, []byte) {
 			it, hasNext := iterFunc()
@@ -122,8 +132,8 @@ func (g Potion) BlocksIterator(
 				return element.Block{}, false, []byte{}
 			}
 
-			var hash string
-			if err := storage.Deserialize(it.Value, &hash); err != nil {
+			hash, ok := it.Value.(string)
+			if !ok {
 				return element.Block{}, false, []byte{}
 			}
 
@@ -132,7 +142,7 @@ func (g Potion) BlocksIterator(
 				return element.Block{}, false, []byte{}
 			}
 
-			return b, hasNext, it.Key
+			return b, hasNext, nil
 		}), (func() {
 			closeFunc()
 		})
@@ -180,4 +190,50 @@ func (g Potion) Transaction(hash string) (tx element.Transaction, err error) {
 		return
 	}
 	return
+}
+
+func (g Potion) OperationsByHeight(start, end uint64) (
+	func() (element.Operation, bool, []byte),
+	func(),
+) {
+	return func() (element.Operation, bool, []byte) {
+			return element.Operation{}, false, nil
+		},
+		func() {}
+}
+
+func (g Potion) BlockStat() (element.BlockStat, error) {
+	var bs element.BlockStat
+	err := g.s.Get(element.GetBlockStatKey(), &bs)
+	return bs, err
+}
+
+func (g Potion) TransactionsByBlock(hash string, options storage.ListOptions) (
+	func() (element.Transaction, bool, []byte),
+	func(),
+) {
+	return func() (element.Transaction, bool, []byte) {
+			return element.Transaction{}, false, nil
+		},
+		func() {}
+}
+
+func (g Potion) TransactionsByAccount(address string, options storage.ListOptions) (
+	func() (element.Transaction, bool, []byte),
+	func(),
+) {
+	return func() (element.Transaction, bool, []byte) {
+			return element.Transaction{}, false, nil
+		},
+		func() {}
+}
+
+func (g Potion) OperationsByTransaction(hash string, options storage.ListOptions) (
+	func() (element.Operation, bool, []byte),
+	func(),
+) {
+	return func() (element.Operation, bool, []byte) {
+			return element.Operation{}, false, nil
+		},
+		func() {}
 }

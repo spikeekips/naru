@@ -2,7 +2,7 @@ package storage
 
 type Storage interface {
 	Initialize() error
-	Batch() BatchStorage
+	Batch() (BatchStorage, error)
 	Has(string) (bool, error)
 	Get(string, interface{}) error
 	Iterator(string, interface{}, ListOptions) (func() (Record, bool /* has next */) /* close func */, func())
@@ -16,4 +16,5 @@ type BatchStorage interface {
 	Storage
 	Write() error
 	Cancel() error
+	Close() error
 }

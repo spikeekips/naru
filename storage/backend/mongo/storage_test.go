@@ -543,6 +543,18 @@ func (t *testMongoStorage) TestInsertWithoutDocument() {
 	t.Nil(r)
 }
 
+type testUint64OverflowStruct struct {
+	Value uint64
+}
+
+func (t *testMongoStorage) TestUint64Overflow() {
+	value := testUint64OverflowStruct{
+		Value: 10000164000000000000,
+	}
+	err := t.s.Insert(element.InternalPrefix, value)
+	t.NoError(err)
+}
+
 func TestMongoStorage(t *testing.T) {
 	if client, err := connect(); err != nil {
 		log.Warn("mongodb test will be skipped")

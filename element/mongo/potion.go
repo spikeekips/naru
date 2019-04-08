@@ -1,9 +1,10 @@
 package mongoelement
 
+// TODO indexing
+
 import (
 	"context"
 
-	sebakstorage "boscoin.io/sebak/lib/storage"
 	"go.mongodb.org/mongo-driver/bson"
 	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
 
@@ -28,6 +29,72 @@ func (g Potion) Account(address string) (element.Account, error) {
 	var ac element.Account
 	err := g.s.Get(element.GetAccountKey(address), &ac)
 	return ac, err
+}
+
+func (g Potion) Accounts(sort string, options storage.ListOptions) (
+	func() (element.Account, bool, []byte),
+	func(),
+) {
+	nullIterFunc := func() (element.Account, bool, []byte) {
+		return element.Account{}, false, nil
+	}
+	nullCloseFunc := func() {}
+
+	col, err := g.s.Collection(element.AccountPrefix)
+	if err != nil {
+		return nullIterFunc, nullCloseFunc
+	}
+
+	q := bson.M{}
+
+	reverse := 1
+	if options.Reverse() {
+		reverse = -1
+	}
+
+	if len(options.Cursor()) > 0 {
+		dir := "$lt"
+		if options.Reverse() {
+			dir = "$gt"
+		}
+
+		q = bson.M{
+			"$and": bson.A{
+				bson.M{mongostorage.DocField("address"): bson.M{dir: string(options.Cursor())}},
+				q,
+			}}
+	}
+
+	if len(sort) < 1 {
+		sort = mongostorage.DocField("createdheight")
+	}
+
+	cur, err := col.Find(
+		context.Background(),
+		q,
+		mongooptions.Find().
+			SetSort(bson.D{{mongostorage.DocField(sort), reverse}, {"_id", reverse}}).
+			SetLimit(int64(options.Limit())),
+	)
+	if err != nil {
+		return nullIterFunc, nullCloseFunc
+	}
+
+	return func() (element.Account, bool, []byte) {
+			next := cur.Next(context.Background())
+			if !next {
+				defer cur.Close(context.Background())
+				return element.Account{}, false, nil
+			}
+
+			b := []byte(cur.Current)
+			var account element.Account
+			_, err = mongostorage.UnmarshalDocument(b, &account)
+			return account, true, b
+		},
+		func() {
+			cur.Close(context.Background())
+		}
 }
 
 func (g Potion) Block(hash string) (element.Block, error) {
@@ -95,34 +162,52 @@ func (g Potion) LastBlock() (element.Block, error) {
 	return block, err
 }
 
-func (g Potion) BlocksIterator(
-	iterFunc func() (sebakstorage.IterItem, bool),
-	closeFunc func(),
-) (
+func (g Potion) BlocksByHeight(start, end uint64) (
 	func() (element.Block, bool, []byte),
 	func(),
 ) {
+	nullIterFunc := func() (element.Block, bool, []byte) {
+		return element.Block{}, false, nil
+	}
+	nullCloseFunc := func() {}
 
-	return (func() (element.Block, bool, []byte) {
-			it, hasNext := iterFunc()
-			if !hasNext {
-				return element.Block{}, false, []byte{}
+	col, err := g.s.Collection(element.BlockPrefix)
+	if err != nil {
+		return nullIterFunc, nullCloseFunc
+	}
+
+	q := bson.M{
+		"$and": bson.A{
+			bson.M{mongostorage.DocField("block.header.height"): bson.M{"$gte": start}},
+			bson.M{mongostorage.DocField("block.header.height"): bson.M{"$lt": end}},
+		},
+	}
+
+	cur, err := col.Find(
+		context.Background(),
+		q,
+		mongooptions.Find().
+			SetSort(bson.M{mongostorage.DocField("block.header.height"): 1}),
+	)
+	if err != nil {
+		return nullIterFunc, nullCloseFunc
+	}
+
+	return func() (element.Block, bool, []byte) {
+			next := cur.Next(context.Background())
+			if !next {
+				defer cur.Close(context.Background())
+				return element.Block{}, false, nil
 			}
 
-			var hash string
-			if err := storage.Deserialize(it.Value, &hash); err != nil {
-				return element.Block{}, false, []byte{}
-			}
-
-			b, err := g.Block(hash)
-			if err != nil {
-				return element.Block{}, false, []byte{}
-			}
-
-			return b, hasNext, it.Key
-		}), (func() {
-			closeFunc()
-		})
+			b := []byte(cur.Current)
+			var block element.Block
+			_, err = mongostorage.UnmarshalDocument(b, &block)
+			return block, true, b
+		},
+		func() {
+			cur.Close(context.Background())
+		}
 }
 
 func (g Potion) Operation(hash string) (op element.Operation, err error) {
@@ -179,7 +264,68 @@ func (g Potion) OperationsByAccount(address string, options storage.ListOptions)
 	if err != nil {
 		return nullIterFunc, nullCloseFunc
 	}
-	defer cur.Close(context.Background())
+
+	return func() (element.Operation, bool, []byte) {
+			next := cur.Next(context.Background())
+			if !next {
+				defer cur.Close(context.Background())
+				return element.Operation{}, false, nil
+			}
+
+			b := []byte(cur.Current)
+			var operation element.Operation
+			_, err = mongostorage.UnmarshalDocument(b, &operation)
+			return operation, true, b
+		},
+		func() {
+			cur.Close(context.Background())
+		}
+}
+
+func (g Potion) OperationsByTransaction(hash string, options storage.ListOptions) (
+	func() (element.Operation, bool, []byte),
+	func(),
+) {
+	nullIterFunc := func() (element.Operation, bool, []byte) {
+		return element.Operation{}, false, nil
+	}
+	nullCloseFunc := func() {}
+
+	col, err := g.s.Collection(element.OperationPrefix)
+	if err != nil {
+		return nullIterFunc, nullCloseFunc
+	}
+
+	q := bson.M{mongostorage.DocField("txhash"): hash}
+
+	if len(options.Cursor()) > 0 {
+		dir := "$lt"
+		if options.Reverse() {
+			dir = "$gt"
+		}
+
+		q = bson.M{
+			"$and": bson.A{
+				bson.M{mongostorage.DocField("hash"): bson.M{dir: string(options.Cursor())}},
+				q,
+			}}
+	}
+
+	reverse := 1
+	if options.Reverse() {
+		reverse = -1
+	}
+
+	cur, err := col.Find(
+		context.Background(),
+		q,
+		mongooptions.Find().
+			SetSort(bson.M{mongostorage.DocField("hash"): reverse}).
+			SetLimit(int64(options.Limit())),
+	)
+	if err != nil {
+		return nullIterFunc, nullCloseFunc
+	}
 
 	return func() (element.Operation, bool, []byte) {
 			next := cur.Next(context.Background())
@@ -205,4 +351,191 @@ func (g Potion) ExistsTransaction(hash string) (bool, error) {
 func (g Potion) Transaction(hash string) (tx element.Transaction, err error) {
 	err = g.s.Get(element.GetTransactionKey(hash), &tx)
 	return
+}
+
+func (g Potion) TransactionsByBlock(hash string, options storage.ListOptions) (
+	func() (element.Transaction, bool, []byte),
+	func(),
+) {
+	nullIterFunc := func() (element.Transaction, bool, []byte) {
+		return element.Transaction{}, false, nil
+	}
+	nullCloseFunc := func() {}
+
+	block, err := g.Block(hash)
+	if err != nil {
+		return nullIterFunc, nullCloseFunc
+	}
+
+	col, err := g.s.Collection(element.TransactionPrefix)
+	if err != nil {
+		return nullIterFunc, nullCloseFunc
+	}
+
+	q := bson.M{
+		mongostorage.DocField("hash"): bson.M{
+			"$in": block.Transactions,
+		},
+	}
+
+	if len(options.Cursor()) > 0 {
+		dir := "$lt"
+		if options.Reverse() {
+			dir = "$gt"
+		}
+
+		q = bson.M{
+			"$and": bson.A{
+				bson.M{mongostorage.DocField("hash"): bson.M{dir: string(options.Cursor())}},
+				q,
+			}}
+	}
+
+	reverse := 1
+	if options.Reverse() {
+		reverse = -1
+	}
+
+	cur, err := col.Find(
+		context.Background(),
+		q,
+		mongooptions.Find().
+			SetSort(bson.M{mongostorage.DocField("hash"): reverse}).
+			SetLimit(int64(options.Limit())),
+	)
+	if err != nil {
+		return nullIterFunc, nullCloseFunc
+	}
+
+	return func() (element.Transaction, bool, []byte) {
+			next := cur.Next(context.Background())
+			if !next {
+				defer cur.Close(context.Background())
+				return element.Transaction{}, false, nil
+			}
+
+			b := []byte(cur.Current)
+			var transaction element.Transaction
+			_, err = mongostorage.UnmarshalDocument(b, &transaction)
+			return transaction, true, b
+		},
+		func() {
+			cur.Close(context.Background())
+		}
+}
+
+func (g Potion) OperationsByHeight(start, end uint64) (
+	func() (element.Operation, bool, []byte),
+	func(),
+) {
+	nullIterFunc := func() (element.Operation, bool, []byte) {
+		return element.Operation{}, false, nil
+	}
+	nullCloseFunc := func() {}
+
+	col, err := g.s.Collection(element.OperationPrefix)
+	if err != nil {
+		return nullIterFunc, nullCloseFunc
+	}
+
+	q := bson.M{
+		"$and": bson.A{
+			bson.M{mongostorage.DocField("height"): bson.M{"$gte": start}},
+			bson.M{mongostorage.DocField("height"): bson.M{"$lt": end}},
+		},
+	}
+
+	cur, err := col.Find(
+		context.Background(),
+		q,
+		mongooptions.Find().
+			SetSort(bson.M{mongostorage.DocField("height"): 1}),
+	)
+	if err != nil {
+		return nullIterFunc, nullCloseFunc
+	}
+
+	return func() (element.Operation, bool, []byte) {
+			next := cur.Next(context.Background())
+			if !next {
+				defer cur.Close(context.Background())
+				return element.Operation{}, false, nil
+			}
+
+			b := []byte(cur.Current)
+			var operation element.Operation
+			_, err = mongostorage.UnmarshalDocument(b, &operation)
+			return operation, true, b
+		},
+		func() {
+			cur.Close(context.Background())
+		}
+}
+
+func (g Potion) BlockStat() (element.BlockStat, error) {
+	var bs element.BlockStat
+	err := g.s.Get(element.GetBlockStatKey(), &bs)
+	return bs, err
+}
+
+func (g Potion) TransactionsByAccount(address string, options storage.ListOptions) (
+	func() (element.Transaction, bool, []byte),
+	func(),
+) {
+	nullIterFunc := func() (element.Transaction, bool, []byte) {
+		return element.Transaction{}, false, nil
+	}
+	nullCloseFunc := func() {}
+
+	col, err := g.s.Collection(element.TransactionPrefix)
+	if err != nil {
+		return nullIterFunc, nullCloseFunc
+	}
+
+	q := bson.M{mongostorage.DocField("source"): address}
+
+	reverse := 1
+	if options.Reverse() {
+		reverse = -1
+	}
+
+	if len(options.Cursor()) > 0 {
+		dir := "$lt"
+		if options.Reverse() {
+			dir = "$gt"
+		}
+
+		q = bson.M{
+			"$and": bson.A{
+				bson.M{mongostorage.DocField("hash"): bson.M{dir: string(options.Cursor())}},
+				q,
+			}}
+	}
+
+	cur, err := col.Find(
+		context.Background(),
+		q,
+		mongooptions.Find().
+			SetSort(bson.M{mongostorage.DocField("confirmed"): reverse}).
+			SetLimit(int64(options.Limit())),
+	)
+	if err != nil {
+		return nullIterFunc, nullCloseFunc
+	}
+
+	return func() (element.Transaction, bool, []byte) {
+			next := cur.Next(context.Background())
+			if !next {
+				defer cur.Close(context.Background())
+				return element.Transaction{}, false, nil
+			}
+
+			b := []byte(cur.Current)
+			var transaction element.Transaction
+			_, err = mongostorage.UnmarshalDocument(b, &transaction)
+			return transaction, true, b
+		},
+		func() {
+			cur.Close(context.Background())
+		}
 }

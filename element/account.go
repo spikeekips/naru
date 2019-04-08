@@ -4,37 +4,61 @@ import (
 	"fmt"
 
 	sebakblock "boscoin.io/sebak/lib/block"
+	sebakcommon "boscoin.io/sebak/lib/common"
 
 	"github.com/spikeekips/naru/storage"
 )
 
 type Account struct {
-	sebakblock.BlockAccount
+	Address       string             `json:"address"`
+	Balance       sebakcommon.Amount `json:"balance"`
+	SequenceID    uint64             `json:"sequence_id"`
+	Linked        string             `json:"linked"`
+	CodeHash      []byte             `json:"code_hash"`
+	RootHash      sebakcommon.Hash   `json:"root_hash"`
+	CreatedHeight uint64             `json:"created_height"`
 }
 
 func NewAccount(ac sebakblock.BlockAccount) Account {
-	return Account{BlockAccount: ac}
+	return Account{
+		Address:    ac.Address,
+		Balance:    ac.Balance,
+		SequenceID: ac.SequenceID,
+		Linked:     ac.Linked,
+		CodeHash:   ac.CodeHash,
+		RootHash:   ac.RootHash,
+	}
 }
 
 func (a Account) Save(st storage.Storage) error {
 	var f func(string, interface{}) error
-	var event string
+	var created bool
 	if found, err := st.Has(GetAccountKey(a.Address)); err != nil {
 		return err
 	} else if found {
 		f = st.Update
-		//event = EventUpdateAccount
 	} else {
 		f = st.Insert
-		//event = EventNewAccount
+		created = true
 	}
 	err := f(GetAccountKey(a.Address), a)
 	if err == nil {
-		st.Event("OnAfterSaveAccount "+event, st, a)
+		st.Event("OnAfterSaveAccount", st, a, created)
 		return nil
 	}
 
 	return err
+}
+
+func (a Account) BlockAccount() *sebakblock.BlockAccount {
+	return &sebakblock.BlockAccount{
+		Address:    a.Address,
+		Balance:    a.Balance,
+		SequenceID: a.SequenceID,
+		Linked:     a.Linked,
+		CodeHash:   a.CodeHash,
+		RootHash:   a.RootHash,
+	}
 }
 
 func GetAccountKey(address string) string {

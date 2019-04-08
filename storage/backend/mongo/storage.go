@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"regexp"
+	"sync"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -15,11 +16,14 @@ import (
 )
 
 var defaultCollectionName string = "default"
+var defaultConnectTimeout = time.Second * 10
 
 type Storage struct {
+	sync.RWMutex
 	c              *mongo.Client
 	databaseName   string
 	collectionName string
+	config         config.MongoStorage
 }
 
 func NewStorage(c *config.MongoStorage) (*Storage, error) {
@@ -32,6 +36,7 @@ func NewStorage(c *config.MongoStorage) (*Storage, error) {
 		c:              client,
 		databaseName:   c.DB,
 		collectionName: defaultCollectionName,
+		config:         *c,
 	}
 	if err := s.connect(); err != nil {
 		return nil, err
@@ -42,24 +47,25 @@ func NewStorage(c *config.MongoStorage) (*Storage, error) {
 
 func (b *Storage) connect() error {
 	{
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-
-		log.Debug("trying to connect")
+		ctx, _ := context.WithTimeout(context.Background(), defaultConnectTimeout)
 		if err := b.c.Connect(ctx); err != nil {
 			return err
 		}
 	}
 
 	{
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
+		ctx, _ := context.WithTimeout(context.Background(), defaultConnectTimeout)
 		if err := b.c.Ping(ctx, nil); err != nil {
+			b.c.Disconnect(context.Background())
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (b *Storage) New() (*Storage, error) {
+	return NewStorage(&b.config)
 }
 
 func (b *Storage) Database() *mongo.Database {
@@ -87,8 +93,8 @@ func (b *Storage) Initialize() error {
 	return b.Database().Drop(context.Background())
 }
 
-func (b *Storage) Batch() storage.BatchStorage {
-	return NewBatch(b)
+func (b *Storage) Batch() (storage.BatchStorage, error) {
+	return NewBatch(b, true)
 }
 
 func (b *Storage) Has(k string) (bool, error) {
@@ -107,6 +113,7 @@ func (b *Storage) Has(k string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	defer cur.Close(context.Background())
 
 	return cur.Next(context.Background()), cur.Err()
 }

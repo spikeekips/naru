@@ -4,9 +4,8 @@ import (
 	"os"
 	"time"
 
-	logging "github.com/inconshreveable/log15"
-
 	sebakcommon "boscoin.io/sebak/lib/common"
+	logging "github.com/inconshreveable/log15"
 )
 
 var (

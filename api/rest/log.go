@@ -6,11 +6,10 @@ import (
 	"strings"
 	"time"
 
-	logging "github.com/inconshreveable/log15"
-	"github.com/prometheus/common/log"
-
 	sebakcommon "boscoin.io/sebak/lib/common"
 	sebakmetrics "boscoin.io/sebak/lib/metrics"
+	logging "github.com/inconshreveable/log15"
+	"github.com/prometheus/common/log"
 )
 
 type HTTP2ErrorLog15Writer struct {

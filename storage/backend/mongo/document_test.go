@@ -9,14 +9,15 @@ import (
 	"testing"
 
 	sebakcommon "boscoin.io/sebak/lib/common"
-	"github.com/spikeekips/naru/common"
-	"github.com/spikeekips/naru/element"
 	"github.com/stretchr/testify/suite"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsoncodec"
 	"go.mongodb.org/mongo-driver/bson/bsonrw"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+
+	"github.com/spikeekips/naru/common"
+	"github.com/spikeekips/naru/element"
 )
 
 type testMongoDocument struct {

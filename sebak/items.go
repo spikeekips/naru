@@ -5,7 +5,6 @@ import (
 
 	sebakblock "boscoin.io/sebak/lib/block"
 	sebakcommon "boscoin.io/sebak/lib/common"
-	sebakstorage "boscoin.io/sebak/lib/storage"
 	sebaktransaction "boscoin.io/sebak/lib/transaction"
 
 	"github.com/spikeekips/naru/element"
@@ -16,7 +15,7 @@ func GetBlockByHeight(s *Storage, height uint64) (block sebakblock.Block, err er
 	// get last block
 	iterFunc, closeFunc := s.GetIterator(
 		sebakcommon.BlockPrefixHeight,
-		sebakstorage.NewDefaultListOptions(true, nil, 1),
+		storage.NewDefaultListOptions(true, nil, 1),
 	)
 	it, _ := iterFunc()
 	closeFunc()
@@ -42,7 +41,7 @@ func GetLastBlock(s *Storage) (block sebakblock.Block, err error) {
 	// get last block
 	iterFunc, closeFunc := s.GetIterator(
 		sebakcommon.BlockPrefixHeight,
-		sebakstorage.NewDefaultListOptions(true, nil, 1),
+		storage.NewDefaultListOptions(true, nil, 1),
 	)
 	it, _ := iterFunc()
 	closeFunc()
@@ -68,7 +67,7 @@ func GetLastBlock(s *Storage) (block sebakblock.Block, err error) {
 // Blocks returns iterator function and close function. It acts like
 // `GetIterator`, but instead of returning `sebakstorage.IterItem` it returns
 // `sebakblock.Block`.
-func GetBlocks(s *Storage, options sebakstorage.ListOptions) (func() (sebakblock.Block, bool), func()) {
+func GetBlocks(s *Storage, options storage.ListOptions) (func() (sebakblock.Block, bool), func()) {
 	itf, cf := s.GetIterator(sebakcommon.BlockPrefixHeight, options)
 
 	iterFunc := func() (sebakblock.Block, bool) {
@@ -135,7 +134,7 @@ func AccountKey(address string) string {
 	return fmt.Sprintf("%s%s", sebakcommon.BlockAccountPrefixAddress, address)
 }
 
-func GetAccounts(s *Storage, options sebakstorage.ListOptions) (func() (element.Account, bool), func()) {
+func GetAccounts(s *Storage, options storage.ListOptions) (func() (element.Account, bool), func()) {
 	itf, cf := s.GetIterator(sebakcommon.BlockAccountPrefixAddress, options)
 
 	iterFunc := func() (element.Account, bool) {

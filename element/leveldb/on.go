@@ -16,7 +16,7 @@ func EventSync() {
 	storage.Observer.Sync("OnAfterSaveOperation", OnAfterSaveOperation)
 }
 
-func OnAfterSaveAccount(st storage.Storage, account element.Account) {
+func OnAfterSaveAccount(st storage.Storage, account element.Account, created bool) {
 }
 
 func OnAfterSaveBlock(st storage.Storage, block element.Block) {

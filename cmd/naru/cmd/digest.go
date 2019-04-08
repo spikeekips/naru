@@ -5,11 +5,12 @@ import (
 	"github.com/spf13/viper"
 
 	cmdcommon "boscoin.io/sebak/cmd/sebak/common"
-
 	"github.com/spikeekips/cvc"
+
 	"github.com/spikeekips/naru/config"
 	"github.com/spikeekips/naru/digest"
 	"github.com/spikeekips/naru/sebak"
+	leveldbstorage "github.com/spikeekips/naru/storage/backend/leveldb"
 )
 
 var (
@@ -42,7 +43,7 @@ func init() {
 				cmdcommon.PrintError(c, err)
 			}
 
-			cs := serverConfigManager.ConfigPprint()
+			cs := digestConfigManager.ConfigPprint()
 			cs = append(cs, "\n\tstorage-backend", dc.Storage.Backend().Type())
 			log.Debug("config merged", cs...)
 
@@ -91,10 +92,21 @@ func runDigest(dc *digestConfig) error {
 
 	potion := NewPotionByStorage(st)
 
-	provider := sebak.NewJSONRPCStorageProvider(dc.SEBAK.JSONRpc)
+	var provider sebak.StorageProvider
+	if len(dc.Digest.ImportFrom.Path) < 1 {
+		provider = sebak.NewJSONRPCStorageProvider(dc.SEBAK.JSONRpc)
+	} else {
+		lst, err := leveldbstorage.NewStorage(dc.Digest.ImportFrom)
+		if err != nil {
+			log.Crit("failed to load storage", "config", dc.Digest.ImportFrom, "error", err)
+			return err
+		}
+		provider = sebak.NewLocalStorageProvider(lst)
+	}
+
 	sst := sebak.NewStorage(provider)
 
-	runner := digest.NewInitializeDigestRunner(sst, potion, nodeInfo)
+	runner := digest.NewInitializeDigestRunner(sst, potion, nodeInfo, dc.Digest.MaxWorkers, dc.Digest.Blocks)
 	if dc.Digest.RemoteBlock > 0 {
 		runner.TestLastRemoteBlock = dc.Digest.RemoteBlock
 	}
@@ -103,7 +115,7 @@ func runDigest(dc *digestConfig) error {
 	}
 
 	if dc.Digest.Watch {
-		watchRunner := digest.NewWatchDigestRunner(sst, potion, nodeInfo, runner.StoredRemoteBlock().Height+1)
+		watchRunner := digest.NewWatchDigestRunner(sst, potion, nodeInfo, runner.StoredRemoteBlock().Height+1, dc.Digest.MaxWorkers, dc.Digest.Blocks)
 		watchRunner.SetInterval(dc.Digest.WatchInterval)
 		if err = watchRunner.Run(true); err != nil {
 			return err

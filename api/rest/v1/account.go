@@ -5,9 +5,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/gorilla/mux"
-
 	sebakresource "boscoin.io/sebak/lib/node/runner/api/resource"
+	"github.com/gorilla/mux"
 
 	"github.com/spikeekips/naru/api/rest"
 )
@@ -28,7 +27,7 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	payload := sebakresource.NewAccount(&ac.BlockAccount)
+	payload := sebakresource.NewAccount(ac.BlockAccount())
 	jw.WriteObject(payload)
 }
 
@@ -62,7 +61,7 @@ func (h *Handler) GetAccounts(w http.ResponseWriter, r *http.Request) {
 			jw.WriteObject(err)
 			return
 		}
-		rs = append(rs, sebakresource.NewAccount(&ac.BlockAccount))
+		rs = append(rs, sebakresource.NewAccount(ac.BlockAccount()))
 	}
 
 	jw.WriteObject(sebakresource.NewResourceList(rs, "", "", ""))

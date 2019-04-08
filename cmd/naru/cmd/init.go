@@ -3,11 +3,10 @@ package cmd
 import (
 	"os"
 
+	cmdcommon "boscoin.io/sebak/cmd/sebak/common"
 	logging "github.com/inconshreveable/log15"
 	isatty "github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
-
-	cmdcommon "boscoin.io/sebak/cmd/sebak/common"
 
 	restv1 "github.com/spikeekips/naru/api/rest/v1"
 	"github.com/spikeekips/naru/common"

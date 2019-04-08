@@ -5,11 +5,12 @@ import (
 	"net/http"
 	"sync"
 
-	jsonrpc "github.com/gorilla/rpc/json"
-
 	sebakcommon "boscoin.io/sebak/lib/common"
 	sebakrunner "boscoin.io/sebak/lib/node/runner"
-	sebakstorage "boscoin.io/sebak/lib/storage"
+	jsonrpc "github.com/gorilla/rpc/json"
+
+	"github.com/spikeekips/naru/storage"
+	leveldbstorage "github.com/spikeekips/naru/storage/backend/leveldb"
 )
 
 type StorageProvider interface {
@@ -18,7 +19,7 @@ type StorageProvider interface {
 	New() StorageProvider
 	Has(string) (bool, error)
 	Get(string) ([]byte, error)
-	GetIterator(string, sebakstorage.ListOptions) (uint64, []sebakstorage.IterItem, error) // (limit, items, error)
+	GetIterator(string, storage.ListOptions) (func() (storage.IterItem, bool), func())
 }
 
 type JSONRPCStorageProvider struct {
@@ -137,7 +138,7 @@ func (j *JSONRPCStorageProvider) Get(key string) ([]byte, error) {
 	return result.Value, nil
 }
 
-func (j *JSONRPCStorageProvider) GetIterator(prefix string, options sebakstorage.ListOptions) (uint64, []sebakstorage.IterItem, error) {
+func (j *JSONRPCStorageProvider) GetIterator0(prefix string, options storage.ListOptions) (uint64, []storage.IterItem, error) {
 	if len(j.getSnapshot()) < 1 {
 		return 0, nil, ProviderNotOpenedError
 	}
@@ -152,11 +153,130 @@ func (j *JSONRPCStorageProvider) GetIterator(prefix string, options sebakstorage
 		},
 	}
 
-	var result sebakrunner.DBGetIteratorResult
+	var result storage.SEBAKDBGetIteratorResult
 	err := j.request("DB.GetIterator", &args, &result)
 	if err != nil {
 		return 0, nil, err
 	}
 
 	return result.Limit, result.Items, nil
+}
+
+func (j *JSONRPCStorageProvider) GetIterator(prefix string, options storage.ListOptions) (func() (storage.IterItem, bool), func()) {
+	nullIterFunc := func() (storage.IterItem, bool) {
+		return storage.IterItem{}, false
+	}
+	nullCloseFunc := func() {}
+
+	if len(j.getSnapshot()) < 1 {
+		return nullIterFunc, nullCloseFunc
+	}
+
+	dbGetIterator := func(options storage.ListOptions) (uint64, []storage.IterItem, error) {
+		if len(j.getSnapshot()) < 1 {
+			return 0, nil, ProviderNotOpenedError
+		}
+
+		args := sebakrunner.DBGetIteratorArgs{
+			Snapshot: j.getSnapshot(),
+			Prefix:   prefix,
+			Options: sebakrunner.GetIteratorOptions{
+				Reverse: options.Reverse(),
+				Cursor:  options.Cursor(),
+				Limit:   options.Limit(),
+			},
+		}
+
+		var result storage.SEBAKDBGetIteratorResult
+		err := j.request("DB.GetIterator", &args, &result)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		return result.Limit, result.Items, nil
+	}
+
+	var cursor []byte = options.Cursor()
+	var limit uint64
+	var items []storage.IterItem
+	var err error
+	var closed bool
+
+	var all int
+	var n int
+	var iterFunc func() (storage.IterItem, bool)
+	iterFunc = func() (storage.IterItem, bool) {
+		if closed {
+			return storage.IterItem{}, false
+		}
+
+		if options.Limit() > 0 && uint64(all) >= options.Limit() {
+			closed = true
+			return storage.IterItem{}, false
+		}
+
+		if items == nil {
+			options.SetCursor(cursor)
+			limit, items, err = dbGetIterator(options)
+			n = 0
+		}
+
+		if err != nil {
+			log.Error("failed GetIterator", "error", err)
+			return storage.IterItem{}, false
+		}
+		if len(items) == 0 {
+			return storage.IterItem{}, false
+		}
+		if len(items) >= n+1 {
+			defer func() {
+				n += 1
+				all += 1
+			}()
+			return items[n], true
+		}
+		if int(limit) > len(items) {
+			return storage.IterItem{}, false
+		}
+
+		items = nil
+
+		return iterFunc()
+	}
+
+	return iterFunc, func() {
+		closed = true
+	}
+}
+
+type LocalStorageProvider struct {
+	s *leveldbstorage.Storage
+}
+
+func NewLocalStorageProvider(s *leveldbstorage.Storage) *LocalStorageProvider {
+	return &LocalStorageProvider{s: s}
+}
+
+func (j *LocalStorageProvider) Open() error {
+	return nil
+}
+
+func (j *LocalStorageProvider) Close() error {
+	return nil
+}
+
+func (j *LocalStorageProvider) New() StorageProvider {
+	return j
+}
+
+func (j *LocalStorageProvider) Has(key string) (bool, error) {
+	return j.s.Has(key)
+}
+
+func (j *LocalStorageProvider) Get(key string) ([]byte, error) {
+	return j.s.GetRaw(key)
+}
+
+func (j *LocalStorageProvider) GetIterator(prefix string, options storage.ListOptions) (func() (storage.IterItem, bool), func()) {
+	return j.s.IteratorRaw(prefix, options)
 }

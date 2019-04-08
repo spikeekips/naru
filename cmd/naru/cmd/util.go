@@ -19,6 +19,7 @@ import (
 	mongoitem "github.com/spikeekips/naru/element/mongo"
 	"github.com/spikeekips/naru/sebak"
 	"github.com/spikeekips/naru/storage"
+	storagebackend "github.com/spikeekips/naru/storage/backend"
 	leveldbstorage "github.com/spikeekips/naru/storage/backend/leveldb"
 	mongostorage "github.com/spikeekips/naru/storage/backend/mongo"
 )
@@ -60,6 +61,7 @@ func SetAllLogging(c *config.Logs) {
 	c.Package.Restv1.SetLogger(restv1.Log())
 	c.Package.SEBAK.SetLogger(sebak.Log())
 	c.Package.Storage.SetLogger(storage.Log())
+	c.Package.StorageBackend.SetLogger(storagebackend.Log())
 	c.Package.Query.SetLogger(storage.Log())
 }
 

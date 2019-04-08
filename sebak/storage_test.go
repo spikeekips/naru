@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/suite"
-
 	sebakcommon "boscoin.io/sebak/lib/common"
 	sebakerrors "boscoin.io/sebak/lib/errors"
 	sebakstorage "boscoin.io/sebak/lib/storage"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/spikeekips/naru/storage"
 )

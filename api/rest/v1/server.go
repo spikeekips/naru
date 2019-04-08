@@ -5,19 +5,18 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/mux"
-	logging "github.com/inconshreveable/log15"
-	"github.com/spikeekips/naru/cache"
-	"github.com/spikeekips/naru/element"
-	"github.com/spikeekips/naru/sebak"
-	"golang.org/x/net/http2"
-
 	sebakcommon "boscoin.io/sebak/lib/common"
 	sebaknode "boscoin.io/sebak/lib/node"
+	"github.com/gorilla/mux"
+	logging "github.com/inconshreveable/log15"
+	"golang.org/x/net/http2"
 
 	"github.com/spikeekips/naru/api/rest"
+	"github.com/spikeekips/naru/cache"
 	cachebackend "github.com/spikeekips/naru/cache/backend"
 	"github.com/spikeekips/naru/config"
+	"github.com/spikeekips/naru/element"
+	"github.com/spikeekips/naru/sebak"
 )
 
 type Server struct {
@@ -70,6 +69,7 @@ func NewServer(nc *config.Network, sst *sebak.Storage, potion element.Potion, cb
 
 	// TODO ratelimit
 	server.router.Use(rest.FlushWriterMiddleware())
+	server.router.Use(rest.PotionMiddleware(potion))
 	core.Handler = rest.HTTP2Log15Handler{Log: httpLog, Handler: server.router}
 
 	server.addDefaultHandlers()
@@ -77,18 +77,22 @@ func NewServer(nc *config.Network, sst *sebak.Storage, potion element.Potion, cb
 	return server
 }
 
-func (s *Server) AddHandler(pattern string, handler func(http.ResponseWriter, *http.Request)) *mux.Route {
+func (s *Server) AddHandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request)) *mux.Route {
 	return s.router.HandleFunc(pattern, handler)
+}
+
+func (s *Server) AddHandler(pattern string, handler http.Handler) *mux.Route {
+	return s.router.Handle(pattern, handler)
 }
 
 func (s *Server) addDefaultHandlers() {
 	restHandler := NewHandler(s.sst, s.potion, s.cch, s.sebakInfo)
 
-	s.AddHandler("/", restHandler.Index)
-	s.AddHandler("/api/v1/accounts", restHandler.GetAccounts).
+	s.AddHandleFunc("/", restHandler.Index)
+	s.AddHandleFunc("/api/v1/accounts", restHandler.GetAccounts).
 		Methods("POST").
 		Headers("Content-Type", "application/json")
-	s.AddHandler(
+	s.AddHandleFunc(
 		"/api/v1/accounts/{id}",
 		NewCacheHandler(s.cch, time.Second*3, restHandler.GetAccount).
 			Status(time.Second*3, http.StatusNotFound). // no-cache
@@ -100,7 +104,7 @@ func (s *Server) addDefaultHandlers() {
 			Handler(),
 	).
 		Methods("GET")
-	s.AddHandler(
+	s.AddHandleFunc(
 		"/api/v1/blocks/{hashOrHeight}",
 		NewCacheHandler(s.cch, time.Second*3, restHandler.GetBlock).
 			Status(time.Second*3, http.StatusNotFound). // no-cache
@@ -112,10 +116,10 @@ func (s *Server) addDefaultHandlers() {
 			Handler(),
 	).
 		Methods("GET")
-	s.AddHandler("/api/v1/transactions", restHandler.PostTransaction).
+	s.AddHandleFunc("/api/v1/transactions", restHandler.PostTransaction).
 		Methods("POST").
 		Headers("Content-Type", "application/json")
-	s.AddHandler(
+	s.AddHandleFunc(
 		"/api/v1/transactions/{id}/status",
 		NewCacheHandler(s.cch, time.Second*3, restHandler.GetTransactionStatus).
 			Status(0, http.StatusOK). // permanent
@@ -128,7 +132,7 @@ func (s *Server) addDefaultHandlers() {
 			Handler(),
 	).
 		Methods("Get")
-	s.AddHandler(
+	s.AddHandleFunc(
 		"/api/v1/transactions/{id}",
 		NewCacheHandler(s.cch, time.Second*3, restHandler.GetTransactionByHash).
 			Status(time.Second*3, http.StatusNotFound). // no-cache
@@ -139,7 +143,7 @@ func (s *Server) addDefaultHandlers() {
 			}).
 			Handler(),
 	).Methods("Get")
-	s.AddHandler(
+	s.AddHandleFunc(
 		"/api/v1/accounts/{id}/operations",
 		NewStreamer(OperationsByAccountStreamHandler{H: restHandler}, time.Second*10).Handler,
 	).

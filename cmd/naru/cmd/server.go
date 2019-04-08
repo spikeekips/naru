@@ -1,22 +1,19 @@
 package cmd
 
 import (
-	"fmt"
 	"net/http/pprof"
 
+	cmdcommon "boscoin.io/sebak/cmd/sebak/common"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	cmdcommon "boscoin.io/sebak/cmd/sebak/common"
 	"github.com/spikeekips/cvc"
 
+	graphqlapiv1 "github.com/spikeekips/naru/api/graphql/v1"
 	restv1 "github.com/spikeekips/naru/api/rest/v1"
 	cachebackend "github.com/spikeekips/naru/cache/backend"
 	"github.com/spikeekips/naru/config"
 	"github.com/spikeekips/naru/digest"
-	"github.com/spikeekips/naru/element"
 	"github.com/spikeekips/naru/sebak"
-	"github.com/spikeekips/naru/storage"
 )
 
 var (
@@ -99,18 +96,10 @@ func runServer(sc *ServerConfig) error {
 		}
 	}
 
-	storage.Observer.On(element.EventOnAfterSaveBlock, func(v ...interface{}) {
-		fmt.Println("> new block triggered", v)
-	})
-
-	storage.Observer.On(element.EventOnAfterSaveAccount, func(v ...interface{}) {
-		fmt.Println("> account saved triggered", v)
-	})
-
 	provider := sebak.NewJSONRPCStorageProvider(sc.SEBAK.JSONRpc)
 	sst := sebak.NewStorage(provider)
 
-	runner := digest.NewInitializeDigestRunner(sst, potion, nodeInfo)
+	runner := digest.NewInitializeDigestRunner(sst, potion, nodeInfo, sc.Digest.MaxWorkers, sc.Digest.Blocks)
 	if sc.Digest.RemoteBlock > 0 {
 		runner.TestLastRemoteBlock = sc.Digest.RemoteBlock
 	}
@@ -118,7 +107,7 @@ func runServer(sc *ServerConfig) error {
 		return err
 	}
 
-	watchRunner := digest.NewWatchDigestRunner(sst, potion, nodeInfo, runner.StoredRemoteBlock().Height+1)
+	watchRunner := digest.NewWatchDigestRunner(sst, potion, nodeInfo, runner.StoredRemoteBlock().Height+1, sc.Digest.MaxWorkers, sc.Digest.Blocks)
 	watchRunner.SetInterval(sc.Digest.WatchInterval)
 	go func() {
 		if err := watchRunner.Run(false); err != nil {
@@ -131,12 +120,15 @@ func runServer(sc *ServerConfig) error {
 
 	restServer := restv1.NewServer(sc.Network, sst, potion, cb, nodeInfo)
 	if sc.System.Profile {
-		restServer.AddHandler("/debug/pprof/", pprof.Index)
-		restServer.AddHandler("/debug/pprof/cmdline", pprof.Cmdline)
-		restServer.AddHandler("/debug/pprof/profile", pprof.Profile)
-		restServer.AddHandler("/debug/pprof/symbol", pprof.Symbol)
-		restServer.AddHandler("/debug/pprof/trace", pprof.Trace)
+		restServer.AddHandleFunc("/debug/pprof/", pprof.Index)
+		restServer.AddHandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		restServer.AddHandleFunc("/debug/pprof/profile", pprof.Profile)
+		restServer.AddHandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		restServer.AddHandleFunc("/debug/pprof/trace", pprof.Trace)
 	}
+
+	// graphql
+	restServer.AddHandler("/graphql/v1", graphqlapiv1.Handler(potion))
 
 	if err := restServer.Start(); err != nil {
 		log.Crit("failed to run restServer", "error", err)
