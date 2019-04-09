@@ -57,7 +57,6 @@ func (g Potion) checkOne(prefix string, dryRun bool) error {
 		foundNames = append(foundNames, n)
 	}
 	cur.Close(context.Background())
-	log_.Debug("these indices found", "indexes", foundNames)
 
 	var willAdd, willRemove []string
 	for _, i := range allIndexes[prefix] {
@@ -89,7 +88,7 @@ func (g Potion) checkOne(prefix string, dryRun bool) error {
 		willRemove = append(willRemove, j)
 	}
 
-	log_.Debug("these indices will be removed", "indexes", willRemove)
+	log_.Debug("these indices found", "found", foundNames, "will add", willAdd, "will remove", willRemove)
 
 	if !dryRun && len(willRemove) > 0 {
 		for _, r := range willRemove {
@@ -99,7 +98,6 @@ func (g Potion) checkOne(prefix string, dryRun bool) error {
 		}
 	}
 
-	log_.Debug("these indices will be added", "indexes", willAdd)
 	var addIndexes []mongo.IndexModel
 	for _, a := range willAdd {
 		for _, i := range allIndexes[prefix] {
