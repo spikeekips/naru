@@ -167,7 +167,7 @@ func (b *Batch) Insert(k string, v interface{}) error {
 }
 
 func (b *Batch) insert(k string, v interface{}) error {
-	c, err := getCollection(k)
+	c, err := GetCollection(k)
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func (b *Batch) Delete(k string) error {
 }
 
 func (b *Batch) delete(k string) error {
-	c, err := getCollection(k)
+	c, err := GetCollection(k)
 	if err != nil {
 		return err
 	}

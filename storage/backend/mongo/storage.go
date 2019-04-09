@@ -73,7 +73,7 @@ func (b *Storage) Database() *mongo.Database {
 }
 
 func (b *Storage) Collection(key string) (*mongo.Collection, error) {
-	c, err := getCollection(key)
+	c, err := GetCollection(key)
 	if err != nil {
 		return nil, err
 	}

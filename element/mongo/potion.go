@@ -1,11 +1,12 @@
 package mongoelement
 
-// TODO indexing
-
 import (
 	"context"
+	"strings"
 
+	logging "github.com/inconshreveable/log15"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/spikeekips/naru/element"
@@ -19,6 +20,121 @@ type Potion struct {
 
 func NewPotion(s *mongostorage.Storage) Potion {
 	return Potion{s: s}
+}
+
+func (g Potion) checkOne(prefix string, dryRun bool) error {
+	collectionName, err := mongostorage.GetCollection(prefix)
+	if err != nil {
+		return err
+	}
+
+	log_ := log.New(logging.Ctx{"prefix": collectionName, "dryRun": dryRun})
+
+	col, err := g.s.Collection(prefix)
+	if err != nil {
+		return err
+	}
+	indexes := col.Indexes()
+	cur, err := indexes.List(context.Background())
+	if err != nil {
+		return err
+	}
+
+	var foundNames []string
+	for {
+		if !cur.Next(context.Background()) {
+			break
+		}
+		var i bson.M
+		if err := cur.Decode(&i); err != nil {
+			return err
+		}
+		n := i["name"].(string)
+		if !strings.HasPrefix(n, "_naru_") {
+			continue
+		}
+
+		foundNames = append(foundNames, n)
+	}
+	cur.Close(context.Background())
+	log_.Debug("these indices found", "indexes", foundNames)
+
+	var willAdd, willRemove []string
+	for _, i := range allIndexes[prefix] {
+		var found bool
+		for _, j := range foundNames {
+			if j == *i.Options.Name {
+				found = true
+				break
+			}
+		}
+
+		if found {
+			continue
+		}
+		willAdd = append(willAdd, *i.Options.Name)
+	}
+
+	for _, j := range foundNames {
+		var found bool
+		for _, i := range allIndexes[prefix] {
+			if j == *i.Options.Name {
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+		willRemove = append(willRemove, j)
+	}
+
+	log_.Debug("these indices will be removed", "indexes", willRemove)
+
+	if !dryRun && len(willRemove) > 0 {
+		for _, r := range willRemove {
+			if _, err := indexes.DropOne(context.Background(), r); err != nil {
+				return err
+			}
+		}
+	}
+
+	log_.Debug("these indices will be added", "indexes", willAdd)
+	var addIndexes []mongo.IndexModel
+	for _, a := range willAdd {
+		for _, i := range allIndexes[prefix] {
+			if a != *i.Options.Name {
+				continue
+			}
+			addIndexes = append(addIndexes, i)
+		}
+	}
+
+	if !dryRun && len(addIndexes) > 0 {
+		if _, err := indexes.CreateMany(context.Background(), addIndexes); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (g Potion) Check() error {
+	prefixes := []string{
+		element.InternalPrefix,
+		element.BlockPrefix,
+		element.TransactionPrefix,
+		element.AccountPrefix,
+		element.OperationPrefix,
+	}
+
+	for _, prefix := range prefixes {
+		if err := g.checkOne(prefix, false); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (g Potion) Storage() storage.Storage {

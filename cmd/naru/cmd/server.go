@@ -88,6 +88,10 @@ func runServer(sc *ServerConfig) error {
 	}
 
 	potion := NewPotionByStorage(st)
+	if err := potion.Check(); err != nil {
+		log.Crit("failed to check storage", "storage", sc.Storage, "error", err)
+		return err
+	}
 
 	if sc.Digest.Init {
 		if err = st.Initialize(); err != nil {

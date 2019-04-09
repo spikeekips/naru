@@ -12,7 +12,7 @@ var (
 	}
 )
 
-func getCollection(key string) (string, error) {
+func GetCollection(key string) (string, error) {
 	c, ok := CollectionByPrefix[key[:2]]
 	if !ok {
 		return "", UnknownCollection.New()

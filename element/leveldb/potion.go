@@ -62,6 +62,10 @@ func NewPotion(s *leveldbstorage.Storage) Potion {
 	return Potion{s: s}
 }
 
+func (g Potion) Check() error {
+	return nil
+}
+
 func (g Potion) Storage() storage.Storage {
 	return g.s
 }

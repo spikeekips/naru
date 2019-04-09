@@ -5,6 +5,7 @@ import (
 )
 
 type Potion interface {
+	Check() error
 	Storage() storage.Storage
 	Account( /* address */ string) (Account, error)
 	Accounts(string, storage.ListOptions) (
