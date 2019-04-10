@@ -138,30 +138,6 @@ func (j *JSONRPCStorageProvider) Get(key string) ([]byte, error) {
 	return result.Value, nil
 }
 
-func (j *JSONRPCStorageProvider) GetIterator0(prefix string, options storage.ListOptions) (uint64, []storage.IterItem, error) {
-	if len(j.getSnapshot()) < 1 {
-		return 0, nil, ProviderNotOpenedError
-	}
-
-	args := sebakrunner.DBGetIteratorArgs{
-		Snapshot: j.getSnapshot(),
-		Prefix:   prefix,
-		Options: sebakrunner.GetIteratorOptions{
-			Reverse: options.Reverse(),
-			Cursor:  options.Cursor(),
-			Limit:   options.Limit(),
-		},
-	}
-
-	var result storage.SEBAKDBGetIteratorResult
-	err := j.request("DB.GetIterator", &args, &result)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	return result.Limit, result.Items, nil
-}
-
 func (j *JSONRPCStorageProvider) GetIterator(prefix string, options storage.ListOptions) (func() (storage.IterItem, bool), func()) {
 	nullIterFunc := func() (storage.IterItem, bool) {
 		return storage.IterItem{}, false
@@ -239,6 +215,9 @@ func (j *JSONRPCStorageProvider) GetIterator(prefix string, options storage.List
 			return storage.IterItem{}, false
 		}
 
+		if len(items) > 0 {
+			cursor = items[len(items)-1].Key
+		}
 		items = nil
 
 		return iterFunc()

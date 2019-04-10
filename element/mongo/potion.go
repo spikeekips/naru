@@ -174,20 +174,20 @@ func (g Potion) Accounts(sort string, options storage.ListOptions) (
 
 		q = bson.M{
 			"$and": bson.A{
-				bson.M{mongostorage.DocField("address"): bson.M{dir: string(options.Cursor())}},
+				bson.M{"_v.address": bson.M{dir: string(options.Cursor())}},
 				q,
 			}}
 	}
 
 	if len(sort) < 1 {
-		sort = mongostorage.DocField("createdheight")
+		sort = "_v.createdheight"
 	}
 
 	cur, err := col.Find(
 		context.Background(),
 		q,
 		mongooptions.Find().
-			SetSort(bson.D{{mongostorage.DocField(sort), reverse}, {"_id", reverse}}).
+			SetSort(bson.D{{"_v." + sort, reverse}, {"_id", reverse}}).
 			SetLimit(int64(options.Limit())),
 	)
 	if err != nil {
@@ -226,7 +226,7 @@ func (g Potion) BlockByHeight(height uint64) (element.Block, error) {
 		return element.Block{}, err
 	}
 
-	r := col.FindOne(context.Background(), bson.M{mongostorage.DocField("header.height"): height})
+	r := col.FindOne(context.Background(), bson.M{"_v.header.height": height})
 	if err := r.Err(); err != nil {
 		return element.Block{}, err
 	}
@@ -252,7 +252,7 @@ func (g Potion) LastBlock() (element.Block, error) {
 		context.Background(),
 		bson.M{},
 		mongooptions.Find().
-			SetSort(bson.M{mongostorage.DocField("header.height"): -1}).
+			SetSort(bson.M{"_v.header.height": -1}).
 			SetLimit(1),
 	)
 	if err != nil {
@@ -292,8 +292,8 @@ func (g Potion) BlocksByHeight(start, end uint64) (
 
 	q := bson.M{
 		"$and": bson.A{
-			bson.M{mongostorage.DocField("header.height"): bson.M{"$gte": start}},
-			bson.M{mongostorage.DocField("header.height"): bson.M{"$lt": end}},
+			bson.M{"_v.header.height": bson.M{"$gte": start}},
+			bson.M{"_v.header.height": bson.M{"$lt": end}},
 		},
 	}
 
@@ -301,7 +301,7 @@ func (g Potion) BlocksByHeight(start, end uint64) (
 		context.Background(),
 		q,
 		mongooptions.Find().
-			SetSort(bson.M{mongostorage.DocField("header.height"): 1}),
+			SetSort(bson.M{"_v.header.height": 1}),
 	)
 	if err != nil {
 		return nullIterFunc, nullCloseFunc
@@ -345,8 +345,8 @@ func (g Potion) OperationsByAccount(address string, options storage.ListOptions)
 
 	q := bson.M{
 		"$or": bson.A{
-			bson.M{mongostorage.DocField("source"): address},
-			bson.M{mongostorage.DocField("target"): address},
+			bson.M{"_v.source": address},
+			bson.M{"_v.target": address},
 		},
 	}
 
@@ -363,7 +363,7 @@ func (g Potion) OperationsByAccount(address string, options storage.ListOptions)
 
 		q = bson.M{
 			"$and": bson.A{
-				bson.M{mongostorage.DocField("hash"): bson.M{dir: string(options.Cursor())}},
+				bson.M{"_v.hash": bson.M{dir: string(options.Cursor())}},
 				q,
 			}}
 	}
@@ -372,7 +372,7 @@ func (g Potion) OperationsByAccount(address string, options storage.ListOptions)
 		context.Background(),
 		q,
 		mongooptions.Find().
-			SetSort(bson.M{mongostorage.DocField("height"): reverse}).
+			SetSort(bson.M{"_v.height": reverse}).
 			SetLimit(int64(options.Limit())),
 	)
 	if err != nil {
@@ -410,7 +410,7 @@ func (g Potion) OperationsByTransaction(hash string, options storage.ListOptions
 		return nullIterFunc, nullCloseFunc
 	}
 
-	q := bson.M{mongostorage.DocField("txhash"): hash}
+	q := bson.M{"_v.txhash": hash}
 
 	if len(options.Cursor()) > 0 {
 		dir := "$lt"
@@ -420,7 +420,7 @@ func (g Potion) OperationsByTransaction(hash string, options storage.ListOptions
 
 		q = bson.M{
 			"$and": bson.A{
-				bson.M{mongostorage.DocField("hash"): bson.M{dir: string(options.Cursor())}},
+				bson.M{"_v.hash": bson.M{dir: string(options.Cursor())}},
 				q,
 			}}
 	}
@@ -434,7 +434,7 @@ func (g Potion) OperationsByTransaction(hash string, options storage.ListOptions
 		context.Background(),
 		q,
 		mongooptions.Find().
-			SetSort(bson.M{mongostorage.DocField("hash"): reverse}).
+			SetSort(bson.M{"_v.hash": reverse}).
 			SetLimit(int64(options.Limit())),
 	)
 	if err != nil {
@@ -487,7 +487,7 @@ func (g Potion) TransactionsByBlock(hash string, options storage.ListOptions) (
 	}
 
 	q := bson.M{
-		mongostorage.DocField("hash"): bson.M{
+		"_v.hash": bson.M{
 			"$in": block.Transactions,
 		},
 	}
@@ -500,7 +500,7 @@ func (g Potion) TransactionsByBlock(hash string, options storage.ListOptions) (
 
 		q = bson.M{
 			"$and": bson.A{
-				bson.M{mongostorage.DocField("hash"): bson.M{dir: string(options.Cursor())}},
+				bson.M{"_v.hash": bson.M{dir: string(options.Cursor())}},
 				q,
 			}}
 	}
@@ -514,7 +514,7 @@ func (g Potion) TransactionsByBlock(hash string, options storage.ListOptions) (
 		context.Background(),
 		q,
 		mongooptions.Find().
-			SetSort(bson.M{mongostorage.DocField("hash"): reverse}).
+			SetSort(bson.M{"_v.hash": reverse}).
 			SetLimit(int64(options.Limit())),
 	)
 	if err != nil {
@@ -554,8 +554,8 @@ func (g Potion) OperationsByHeight(start, end uint64) (
 
 	q := bson.M{
 		"$and": bson.A{
-			bson.M{mongostorage.DocField("height"): bson.M{"$gte": start}},
-			bson.M{mongostorage.DocField("height"): bson.M{"$lt": end}},
+			bson.M{"_v.height": bson.M{"$gte": start}},
+			bson.M{"_v.height": bson.M{"$lt": end}},
 		},
 	}
 
@@ -563,7 +563,7 @@ func (g Potion) OperationsByHeight(start, end uint64) (
 		context.Background(),
 		q,
 		mongooptions.Find().
-			SetSort(bson.M{mongostorage.DocField("height"): 1}),
+			SetSort(bson.M{"_v.height": 1}),
 	)
 	if err != nil {
 		return nullIterFunc, nullCloseFunc
@@ -606,7 +606,7 @@ func (g Potion) TransactionsByAccount(address string, options storage.ListOption
 		return nullIterFunc, nullCloseFunc
 	}
 
-	q := bson.M{mongostorage.DocField("source"): address}
+	q := bson.M{"_v.source": address}
 
 	reverse := 1
 	if options.Reverse() {
@@ -621,7 +621,7 @@ func (g Potion) TransactionsByAccount(address string, options storage.ListOption
 
 		q = bson.M{
 			"$and": bson.A{
-				bson.M{mongostorage.DocField("hash"): bson.M{dir: string(options.Cursor())}},
+				bson.M{"_v.hash": bson.M{dir: string(options.Cursor())}},
 				q,
 			}}
 	}
@@ -630,7 +630,7 @@ func (g Potion) TransactionsByAccount(address string, options storage.ListOption
 		context.Background(),
 		q,
 		mongooptions.Find().
-			SetSort(bson.M{mongostorage.DocField("confirmed"): reverse}).
+			SetSort(bson.M{"_v.confirmed": reverse}).
 			SetLimit(int64(options.Limit())),
 	)
 	if err != nil {

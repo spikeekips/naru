@@ -98,7 +98,7 @@ func (b *Storage) Batch() (storage.BatchStorage, error) {
 }
 
 func (b *Storage) Has(k string) (bool, error) {
-	q := bson.M{KEY: k}
+	q := bson.M{"_k": k}
 
 	col, err := b.Collection(k)
 	if err != nil {
@@ -150,7 +150,7 @@ func (b *Storage) Get(k string, v interface{}) error {
 		return err
 	}
 
-	r := col.FindOne(context.Background(), bson.M{KEY: k})
+	r := col.FindOne(context.Background(), bson.M{"_k": k})
 	if err := r.Err(); err != nil {
 		return err
 	}
@@ -165,7 +165,7 @@ func (b *Storage) Get(k string, v interface{}) error {
 }
 
 func (b *Storage) Iterator(prefix string, v interface{}, opt storage.ListOptions) (func() (storage.Record, bool), func()) {
-	q := bson.M{KEY: bson.M{"$regex": "^" + regexp.QuoteMeta(prefix)}}
+	q := bson.M{"_k": bson.M{"$regex": "^" + regexp.QuoteMeta(prefix)}}
 
 	reverse := 1
 	if opt.Reverse() {
@@ -183,14 +183,14 @@ func (b *Storage) Iterator(prefix string, v interface{}, opt storage.ListOptions
 		q = bson.M{
 			"$and": bson.A{
 				q,
-				bson.M{KEY: bson.M{dir: string(opt.Cursor())}},
+				bson.M{"_k": bson.M{dir: string(opt.Cursor())}},
 			},
 		}
 	}
 
 	mopt := options.Find().
 		SetLimit(int64(opt.Limit())).
-		SetSort(bson.M{KEY: reverse})
+		SetSort(bson.M{"_k": reverse})
 
 	col, err := b.Collection(prefix)
 	if err != nil {
@@ -267,7 +267,7 @@ func (b *Storage) Delete(k string) error {
 		return err
 	}
 
-	_, err = col.DeleteOne(context.Background(), bson.M{KEY: k}, nil)
+	_, err = col.DeleteOne(context.Background(), bson.M{"_k": k}, nil)
 	return err
 }
 

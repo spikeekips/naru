@@ -114,7 +114,9 @@ func runDigest(dc *digestConfig) error {
 		return err
 	}
 
+	log.Debug("initializing digest finished")
 	if dc.Digest.Watch {
+		log.Debug("start watching")
 		watchRunner := digest.NewWatchDigestRunner(sst, potion, nodeInfo, runner.StoredRemoteBlock().Height+1, dc.Digest.MaxWorkers, dc.Digest.Blocks)
 		watchRunner.SetInterval(dc.Digest.WatchInterval)
 		if err = watchRunner.Run(true); err != nil {

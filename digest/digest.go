@@ -154,6 +154,9 @@ end:
 		if err := d.saveAccounts(batch); err != nil {
 			return err
 		}
+		if err := batch.Write(); err != nil {
+			return err
+		}
 	}
 
 	// TODO remove

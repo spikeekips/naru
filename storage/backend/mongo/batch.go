@@ -228,7 +228,7 @@ func (b *Batch) delete(k string) error {
 		b.ops[c] = []mongo.WriteModel{}
 	}
 
-	b.ops[c] = append(b.ops[c], mongo.NewDeleteOneModel().SetFilter(bson.M{KEY: k}))
+	b.ops[c] = append(b.ops[c], mongo.NewDeleteOneModel().SetFilter(bson.M{"_k": k}))
 	log.Debug("delete doc", "key", k)
 
 	return nil
