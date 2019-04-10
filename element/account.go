@@ -5,6 +5,7 @@ import (
 
 	sebakblock "boscoin.io/sebak/lib/block"
 	sebakcommon "boscoin.io/sebak/lib/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/spikeekips/naru/storage"
 )
@@ -15,7 +16,7 @@ type Account struct {
 	SequenceID    uint64             `json:"sequence_id"`
 	Linked        string             `json:"linked"`
 	CodeHash      []byte             `json:"code_hash"`
-	RootHash      sebakcommon.Hash   `json:"root_hash"`
+	RootHash      string             `json:"root_hash"`
 	CreatedHeight uint64             `json:"created_height"`
 }
 
@@ -26,7 +27,7 @@ func NewAccount(ac sebakblock.BlockAccount) Account {
 		SequenceID: ac.SequenceID,
 		Linked:     ac.Linked,
 		CodeHash:   ac.CodeHash,
-		RootHash:   ac.RootHash,
+		RootHash:   ac.RootHash.Hex(),
 	}
 }
 
@@ -57,7 +58,7 @@ func (a Account) BlockAccount() *sebakblock.BlockAccount {
 		SequenceID: a.SequenceID,
 		Linked:     a.Linked,
 		CodeHash:   a.CodeHash,
-		RootHash:   a.RootHash,
+		RootHash:   ethcommon.HexToHash(a.RootHash),
 	}
 }
 

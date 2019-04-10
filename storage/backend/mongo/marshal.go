@@ -1,6 +1,7 @@
 package mongostorage
 
 import (
+	"encoding/base64"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 var (
 	tUint64      reflect.Type = reflect.TypeOf(uint64(0))
 	tSEBAKAmount reflect.Type = reflect.TypeOf(sebakcommon.Amount(0))
+	tBytes       reflect.Type = reflect.TypeOf([]byte{})
 )
 
 var DefaultBSONRegistry *bsoncodec.Registry = NewBSONRegistry()
@@ -88,12 +90,46 @@ func SEBAKAmountDecodeValue(dctx bsoncodec.DecodeContext, vr bsonrw.ValueReader,
 	return nil
 }
 
+func BytesEncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, val reflect.Value) error {
+	if !val.IsValid() || val.Type() != tBytes {
+		return bsoncodec.ValueEncoderError{Name: "BytesEncodeValue", Types: []reflect.Type{tBytes}, Received: val}
+	}
+
+	return vw.WriteString(
+		base64.StdEncoding.EncodeToString(val.Interface().([]byte)),
+	)
+}
+
+func BytesDecodeValue(dctx bsoncodec.DecodeContext, vr bsonrw.ValueReader, val reflect.Value) error {
+	if vr.Type() != bsontype.String {
+		return fmt.Errorf("cannot decode %v into []byte", vr.Type())
+	}
+
+	if !val.CanSet() || val.Type() != tBytes {
+		return bsoncodec.ValueDecoderError{Name: "BytesDecodeValue", Types: []reflect.Type{tBytes}, Received: val}
+	}
+
+	s, err := vr.ReadString()
+	if err != nil {
+		return err
+	}
+	data, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return err
+	}
+
+	val.Set(reflect.ValueOf(data))
+	return nil
+}
+
 func NewBSONRegistry() *bsoncodec.Registry {
 	rb := bson.NewRegistryBuilder()
 	rb.RegisterEncoder(tSEBAKAmount, bsoncodec.ValueEncoderFunc(SEBAKAmountEncodeValue))
 	rb.RegisterDecoder(tSEBAKAmount, bsoncodec.ValueDecoderFunc(SEBAKAmountDecodeValue))
 	rb.RegisterEncoder(tUint64, bsoncodec.ValueEncoderFunc(Uint64EncodeValue))
 	rb.RegisterDecoder(tUint64, bsoncodec.ValueDecoderFunc(Uint64DecodeValue))
+	rb.RegisterEncoder(tBytes, bsoncodec.ValueEncoderFunc(BytesEncodeValue))
+	rb.RegisterDecoder(tBytes, bsoncodec.ValueDecoderFunc(BytesDecodeValue))
 
 	return rb.Build()
 }
