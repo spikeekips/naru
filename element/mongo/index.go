@@ -18,30 +18,30 @@ var allIndexes = map[string][]mongo.IndexModel{
 				SetName("_naru_v0_block_k"),
 		},
 		mongo.IndexModel{
-			Keys: bson.M{mongostorage.DocField("block.hash"): 1},
+			Keys: bson.M{mongostorage.DocField("hash"): 1},
 			Options: mongooptions.Index().
 				SetUnique(true).
 				SetName("_naru_v0_block_hash"),
 		},
 		mongo.IndexModel{
-			Keys: bson.M{mongostorage.DocField("block.header.prevblockhash"): 1},
+			Keys: bson.M{mongostorage.DocField("header.prevblockhash"): 1},
 			Options: mongooptions.Index().
 				SetUnique(true).
 				SetName("_naru_v0_block_header.prevblockhash"),
 		},
 		mongo.IndexModel{
-			Keys: bson.M{mongostorage.DocField("block.header.height"): 1},
+			Keys: bson.M{mongostorage.DocField("header.height"): 1},
 			Options: mongooptions.Index().
 				SetUnique(true).
 				SetName("_naru_v0_block_header.height"),
 		},
 		mongo.IndexModel{
-			Keys: bson.M{mongostorage.DocField("block.transactions"): 1},
+			Keys: bson.M{mongostorage.DocField("transactions"): 1},
 			Options: mongooptions.Index().
 				SetName("_naru_v0_block_transactions"),
 		},
 		mongo.IndexModel{
-			Keys: bson.M{mongostorage.DocField("block.confirmed"): 1},
+			Keys: bson.M{mongostorage.DocField("confirmed"): 1},
 			Options: mongooptions.Index().
 				SetName("_naru_v0_block_confirmed"),
 		},

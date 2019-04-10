@@ -11,6 +11,7 @@ import (
 	"github.com/nvellon/hal"
 
 	"github.com/spikeekips/naru/api/rest"
+	resourcev1 "github.com/spikeekips/naru/api/rest/v1/resource"
 	"github.com/spikeekips/naru/element"
 )
 
@@ -39,7 +40,7 @@ func (h *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rs := sebakresource.NewBlock(&block.Block).Resource()
+	rs := resourcev1.NewBlock(&block).Resource()
 
 	rs.Links["self"] = hal.NewLink(strings.Replace(
 		sebakresource.URLBlocks,

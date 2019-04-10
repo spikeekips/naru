@@ -9,11 +9,25 @@ import (
 )
 
 type Block struct {
-	sebakblock.Block
+	sebakblock.Header
+	Transactions        []string
+	ProposerTransaction string
+	Hash                string
+	Proposer            string
+	Round               uint64
+	Confirmed           string
 }
 
 func NewBlock(block sebakblock.Block) Block {
-	return Block{Block: block}
+	return Block{
+		Header:              block.Header,
+		Transactions:        block.Transactions,
+		ProposerTransaction: block.ProposerTransaction,
+		Hash:                block.Hash,
+		Proposer:            block.Proposer,
+		Round:               block.Round,
+		Confirmed:           block.Confirmed,
+	}
 }
 
 func (b Block) Save(st storage.Storage) error {

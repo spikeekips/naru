@@ -226,7 +226,7 @@ func (g Potion) BlockByHeight(height uint64) (element.Block, error) {
 		return element.Block{}, err
 	}
 
-	r := col.FindOne(context.Background(), bson.M{mongostorage.DocField("block.header.height"): height})
+	r := col.FindOne(context.Background(), bson.M{mongostorage.DocField("header.height"): height})
 	if err := r.Err(); err != nil {
 		return element.Block{}, err
 	}
@@ -252,7 +252,7 @@ func (g Potion) LastBlock() (element.Block, error) {
 		context.Background(),
 		bson.M{},
 		mongooptions.Find().
-			SetSort(bson.M{mongostorage.DocField("block.header.height"): -1}).
+			SetSort(bson.M{mongostorage.DocField("header.height"): -1}).
 			SetLimit(1),
 	)
 	if err != nil {
@@ -292,8 +292,8 @@ func (g Potion) BlocksByHeight(start, end uint64) (
 
 	q := bson.M{
 		"$and": bson.A{
-			bson.M{mongostorage.DocField("block.header.height"): bson.M{"$gte": start}},
-			bson.M{mongostorage.DocField("block.header.height"): bson.M{"$lt": end}},
+			bson.M{mongostorage.DocField("header.height"): bson.M{"$gte": start}},
+			bson.M{mongostorage.DocField("header.height"): bson.M{"$lt": end}},
 		},
 	}
 
@@ -301,7 +301,7 @@ func (g Potion) BlocksByHeight(start, end uint64) (
 		context.Background(),
 		q,
 		mongooptions.Find().
-			SetSort(bson.M{mongostorage.DocField("block.header.height"): 1}),
+			SetSort(bson.M{mongostorage.DocField("header.height"): 1}),
 	)
 	if err != nil {
 		return nullIterFunc, nullCloseFunc
