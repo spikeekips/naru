@@ -630,7 +630,7 @@ func (g Potion) TransactionsByAccount(address string, options storage.ListOption
 		context.Background(),
 		q,
 		mongooptions.Find().
-			SetSort(bson.M{"_v.confirmed": reverse}).
+			SetSort(bson.M{"_v.block": reverse}).
 			SetLimit(int64(options.Limit())),
 	)
 	if err != nil {

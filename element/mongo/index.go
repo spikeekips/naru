@@ -39,11 +39,6 @@ var allIndexes = map[string][]mongo.IndexModel{
 			Options: mongooptions.Index().
 				SetName("_naru_v0_block_transactions"),
 		},
-		mongo.IndexModel{
-			Keys: bson.M{"_v.confirmed": 1},
-			Options: mongooptions.Index().
-				SetName("_naru_v0_block_confirmed"),
-		},
 	},
 	element.AccountPrefix: []mongo.IndexModel{
 		mongo.IndexModel{
@@ -93,7 +88,7 @@ var allIndexes = map[string][]mongo.IndexModel{
 				SetName("_naru_v0_transaction_block"),
 		},
 		mongo.IndexModel{
-			Keys: bson.M{"_v.source": 1, "_v.confirmed": 1},
+			Keys: bson.M{"_v.source": 1, "_v.block": 1},
 			Options: mongooptions.Index().
 				SetName("_naru_v0_transaction_source"),
 		},
