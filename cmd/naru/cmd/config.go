@@ -52,7 +52,7 @@ func init() {
 
 		configFileCmd := &cobra.Command{
 			Use:   "file",
-			Short: "print default viper configuration",
+			Short: "print default configuration",
 			Run: func(c *cobra.Command, args []string) {
 				if _, err := configFileManager.Merge(); err != nil {
 					log.Error("failed to merge config", "error", err)
