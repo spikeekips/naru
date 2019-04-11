@@ -41,13 +41,13 @@ func OnAfterSaveTransaction(st storage.Storage, transaction element.Transaction,
 }
 
 func OnAfterSaveOperation(st storage.Storage, operation element.Operation) {
-	if err := st.Insert(GetOperationAccountRelatedKey(operation.Source, operation.Height), operation.Hash); err != nil {
+	if err := st.Insert(GetOperationAccountRelatedKey(operation.Source, operation.Block), operation.Hash); err != nil {
 		return
 	}
 
 	var events []string = []string{element.GetOperationAccountRelatedEventKey(operation.Source)}
 	if len(operation.Target) > 0 {
-		if err := st.Insert(GetOperationAccountRelatedKey(operation.Target, operation.Height), operation.Hash); err != nil {
+		if err := st.Insert(GetOperationAccountRelatedKey(operation.Target, operation.Block), operation.Hash); err != nil {
 			return
 		}
 

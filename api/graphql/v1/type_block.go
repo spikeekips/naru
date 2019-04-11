@@ -4,6 +4,7 @@ import (
 	"github.com/graphql-go/graphql"
 
 	"github.com/spikeekips/naru/element"
+	"github.com/spikeekips/naru/storage"
 )
 
 func getBlockBySource(p graphql.ResolveParams) (element.Block, error) {
@@ -95,7 +96,7 @@ var BlockType = graphql.NewObject(graphql.ObjectConfig{
 				return block.Header.TotalOps, nil
 			},
 		},
-		"transactions": &graphql.Field{
+		"transaction_hashes": &graphql.Field{
 			// TODO should be TransactionType
 			Type: graphql.NewList(graphql.String),
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
@@ -107,7 +108,36 @@ var BlockType = graphql.NewObject(graphql.ObjectConfig{
 				return block.Transactions, nil
 			},
 		},
-		"proposer_transaction": &graphql.Field{
+		"transactions": &graphql.Field{
+			// TODO should be TransactionType
+			Type: graphql.NewList(TransactionType),
+			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				block, err := getBlockBySource(p)
+				if err != nil {
+					return nil, err
+				}
+
+				potion, err := GetPotionFromParams(p)
+				if err != nil {
+					return nil, err
+				}
+
+				var transactions []element.Transaction
+				iterFunc, closeFunc := potion.TransactionsByBlock(block.Hash, storage.NewDefaultListOptions(false, nil, 0))
+				defer closeFunc()
+
+				for {
+					transaction, next, _ := iterFunc()
+					if !next {
+						break
+					}
+					transactions = append(transactions, transaction)
+				}
+
+				return transactions, nil
+			},
+		},
+		"proposer_transaction_hash": &graphql.Field{
 			// TODO should be TransactionType
 			Type: graphql.String,
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
@@ -117,6 +147,21 @@ var BlockType = graphql.NewObject(graphql.ObjectConfig{
 				}
 
 				return block.ProposerTransaction, nil
+			},
+		},
+		"proposer_transaction": &graphql.Field{
+			Type: TransactionType,
+			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				block, err := getBlockBySource(p)
+				if err != nil {
+					return nil, err
+				}
+
+				potion, err := GetPotionFromParams(p)
+				if err != nil {
+					return nil, err
+				}
+				return potion.Transaction(block.ProposerTransaction)
 			},
 		},
 		"hash": &graphql.Field{

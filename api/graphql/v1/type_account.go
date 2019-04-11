@@ -66,15 +66,15 @@ var AccountType = graphql.NewObject(graphql.ObjectConfig{
 				return ac.Linked, nil
 			},
 		},
-		"created_height": &graphql.Field{
-			Type: graphql.String,
+		"created_block": &graphql.Field{
+			Type: graphql.Int,
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				ac, ok := p.Source.(element.Account)
 				if !ok {
 					return nil, SourceNotFound.New()
 				}
 
-				return strconv.FormatUint(ac.CreatedHeight, 10), nil
+				return ac.CreatedBlock, nil
 			},
 		},
 	},

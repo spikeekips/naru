@@ -31,23 +31,14 @@ var TransactionType = graphql.NewObject(graphql.ObjectConfig{
 			},
 		},
 		"block": &graphql.Field{
-			Type: BlockType,
+			Type: graphql.Int,
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				transaction, err := getTransactionBySource(p)
 				if err != nil {
 					return nil, err
 				}
 
-				potion, err := GetPotionFromParams(p)
-				if err != nil {
-					return nil, err
-				}
-				block, err := potion.Block(transaction.Block)
-				if err != nil {
-					return nil, err
-				}
-
-				return block, nil
+				return transaction.Block, nil
 			},
 		},
 		"sequence_id": &graphql.Field{

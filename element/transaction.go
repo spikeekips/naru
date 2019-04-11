@@ -27,7 +27,7 @@ type Transaction struct {
 	Raw []byte `json:"raw"`
 
 	Hash       string             `json:"hash"`
-	Block      string             `json:"block"` // `Block.Hash`
+	Block      uint64             `json:"block"`
 	SequenceID uint64             `json:"sequence_id"`
 	Signature  string             `json:"signature"`
 	Source     string             `json:"source"`
@@ -57,7 +57,7 @@ func NewTransaction(tx sebaktransaction.Transaction, block Block, raw []byte) Tr
 	created, _ := common.ParseISO8601(tx.H.Created)
 	return Transaction{
 		Hash:       tx.H.Hash,
-		Block:      block.Hash,
+		Block:      block.Header.Height,
 		SequenceID: tx.B.SequenceID,
 		Signature:  tx.H.Signature,
 		Source:     tx.B.Source,

@@ -105,8 +105,7 @@ var OperationType = graphql.NewObject(graphql.ObjectConfig{
 				return potion.Account(operation.Target)
 			},
 		},
-
-		"height": &graphql.Field{
+		"block": &graphql.Field{
 			Type: graphql.Int,
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				operation, err := getOperationBySource(p)
@@ -114,31 +113,9 @@ var OperationType = graphql.NewObject(graphql.ObjectConfig{
 					return nil, err
 				}
 
-				return operation.Height, nil
+				return operation.Block, nil
 			},
 		},
-
-		"block": &graphql.Field{
-			Type: BlockType,
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				operation, err := getOperationBySource(p)
-				if err != nil {
-					return nil, err
-				}
-
-				potion, err := GetPotionFromParams(p)
-				if err != nil {
-					return nil, err
-				}
-				block, err := potion.BlockByHeight(operation.Height)
-				if err != nil {
-					return nil, err
-				}
-
-				return block, nil
-			},
-		},
-
 		"sequence_id": &graphql.Field{
 			Type: graphql.Int,
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {

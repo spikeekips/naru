@@ -11,13 +11,13 @@ import (
 )
 
 type Account struct {
-	Address       string             `json:"address"`
-	Balance       sebakcommon.Amount `json:"balance"`
-	SequenceID    uint64             `json:"sequence_id"`
-	Linked        string             `json:"linked"`
-	CodeHash      []byte             `json:"code_hash"`
-	RootHash      string             `json:"root_hash"`
-	CreatedHeight uint64             `json:"created_height"`
+	Address      string             `json:"address"`
+	Balance      sebakcommon.Amount `json:"balance"`
+	SequenceID   uint64             `json:"sequence_id"`
+	Linked       string             `json:"linked"`
+	CodeHash     []byte             `json:"code_hash"`
+	RootHash     string             `json:"root_hash"`
+	CreatedBlock uint64             `json:"created_height"`
 }
 
 func NewAccount(ac sebakblock.BlockAccount) Account {

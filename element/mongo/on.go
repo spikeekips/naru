@@ -76,7 +76,7 @@ func OnAfterDigest(potion element.Potion, start, end uint64) {
 				log.Error("failed to get account", "error", err)
 				continue
 			}
-			ac.CreatedHeight = operation.Height
+			ac.CreatedBlock = operation.Block
 
 			if err := potion.Storage().Update(element.GetAccountKey(ac.Address), ac); err != nil {
 				log.Error("failed to save account with CreatedHeight", "error", err)

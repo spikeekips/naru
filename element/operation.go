@@ -19,7 +19,7 @@ type Operation struct {
 	Type       sebakoperation.OperationType `json:"type"`
 	Source     string                       `json:"source"`
 	Target     string                       `json:"target"`
-	Height     uint64                       `json:"block_height"`
+	Block      uint64                       `json:"block"`
 	SequenceID uint64                       `json:"sequence_id"`
 	Linked     string                       `json:"linked"`
 	Amount     sebakcommon.Amount           `json:"amount"`
@@ -58,7 +58,7 @@ func NewOperation(op sebakoperation.Operation, tx sebaktransaction.Transaction, 
 		Type:       op.H.Type,
 		Source:     tx.B.Source,
 		Target:     target,
-		Height:     blockHeight,
+		Block:      blockHeight,
 		SequenceID: tx.B.SequenceID,
 		Linked:     linked,
 		Amount:     amount,
