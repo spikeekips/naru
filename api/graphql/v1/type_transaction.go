@@ -1,7 +1,6 @@
 package graphqlapiv1
 
 import (
-	sebakcommon "boscoin.io/sebak/lib/common"
 	"github.com/graphql-go/graphql"
 
 	"github.com/spikeekips/naru/element"
@@ -151,7 +150,7 @@ var TransactionType = graphql.NewObject(graphql.ObjectConfig{
 					return nil, err
 				}
 
-				return sebakcommon.ParseISO8601(transaction.Confirmed)
+				return transaction.Confirmed, nil
 			},
 		},
 		"created": &graphql.Field{
@@ -162,7 +161,7 @@ var TransactionType = graphql.NewObject(graphql.ObjectConfig{
 					return nil, err
 				}
 
-				return sebakcommon.ParseISO8601(transaction.Created)
+				return transaction.Created, nil
 			},
 		},
 		"raw": &graphql.Field{

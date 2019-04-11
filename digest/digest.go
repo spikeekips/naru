@@ -239,7 +239,7 @@ func (d *Digest) digestBlocksByHeight(start, end uint64) error {
 
 	log_.Debug(
 		"block digested",
-		"last-block", block.Height,
+		"last-block", block.Header.Height,
 		"blocks", len(blocks),
 		"elapsed", time.Now().Sub(started),
 		"digest-elapsed", time.Now().Sub(digestStarted),
@@ -252,7 +252,7 @@ func (d *Digest) digestBlocksByHeight(start, end uint64) error {
 
 	log_.Debug(
 		"blocks saved",
-		"last-block", block.Height,
+		"last-block", block.Header.Height,
 		"blocks", len(blocks),
 		"elapsed", time.Now().Sub(started),
 		"write-elapsed", time.Now().Sub(writeStarted),
@@ -268,17 +268,17 @@ func (d *Digest) digestBlock(st storage.Storage, block element.Block) error {
 
 	txs, err := sebak.GetTransactions(d.sst, txHashes...)
 	if err != nil {
-		log.Error("failed to get transactions from block", "block", block.Height, "error", err)
+		log.Error("failed to get transactions from block", "block", block.Header.Height, "error", err)
 		return err
 	}
 
 	err = d.saveBlock(st, block, txs)
 	if err != nil {
 		if err == sebakerrors.BlockAlreadyExists {
-			log.Warn("block already exists", "block", block.Height)
+			log.Warn("block already exists", "block", block.Header.Height)
 			return nil
 		} else {
-			log.Error("failed to save block and transactions", "block", block.Height, "error", err)
+			log.Error("failed to save block and transactions", "block", block.Header.Height, "error", err)
 			return err
 		}
 	}
@@ -422,7 +422,7 @@ func (d *Digest) saveBlock(st storage.Storage, block element.Block, txs []elemen
 
 	if !d.initialize {
 		if err := d.saveAccounts(st, addresses...); err != nil {
-			log.Error("failed to save accounts", "block", block.Height, "error", err, "txs", txs)
+			log.Error("failed to save accounts", "block", block.Header.Height, "error", err, "txs", txs)
 			return err
 		}
 	}

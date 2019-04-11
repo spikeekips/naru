@@ -3,12 +3,14 @@ package element
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	sebakblock "boscoin.io/sebak/lib/block"
 	sebakcommon "boscoin.io/sebak/lib/common"
 	sebaktransaction "boscoin.io/sebak/lib/transaction"
 	sebakoperation "boscoin.io/sebak/lib/transaction/operation"
 
+	"github.com/spikeekips/naru/common"
 	"github.com/spikeekips/naru/storage"
 )
 
@@ -32,8 +34,8 @@ type Transaction struct {
 	Fee        sebakcommon.Amount `json:"fee"`
 	Operations []string           `json:"operations"`
 	Amount     sebakcommon.Amount `json:"amount"`
-	Confirmed  string             `json:"confirmed"`
-	Created    string             `json:"created"`
+	Confirmed  time.Time          `json:"confirmed"`
+	Created    time.Time          `json:"created"`
 
 	tx       sebaktransaction.Transaction
 	block    Block
@@ -52,6 +54,7 @@ func NewTransaction(tx sebaktransaction.Transaction, block Block, raw []byte) Tr
 		)
 	}
 
+	created, _ := common.ParseISO8601(tx.H.Created)
 	return Transaction{
 		Hash:       tx.H.Hash,
 		Block:      block.Hash,
@@ -61,8 +64,8 @@ func NewTransaction(tx sebaktransaction.Transaction, block Block, raw []byte) Tr
 		Fee:        tx.B.Fee,
 		Operations: opHashes,
 		Amount:     tx.TotalAmount(true),
-		Confirmed:  block.ProposedTime,
-		Created:    tx.H.Created,
+		Confirmed:  block.Header.ProposedTime,
+		Created:    created,
 		Raw:        raw,
 		tx:         tx,
 		block:      block,
@@ -77,7 +80,7 @@ func (t Transaction) Save(st storage.Storage) error {
 	st.Event("OnAfterSaveTransaction", st, t, t.tx, t.block)
 
 	for opIndex, op := range t.tx.B.Operations {
-		o, err := NewOperation(op, t.tx, uint64(opIndex), t.block.Height)
+		o, err := NewOperation(op, t.tx, uint64(opIndex), t.block.Header.Height)
 		if err != nil {
 			return err
 		}

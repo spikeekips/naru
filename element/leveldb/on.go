@@ -20,21 +20,21 @@ func OnAfterSaveAccount(st storage.Storage, account element.Account, created boo
 }
 
 func OnAfterSaveBlock(st storage.Storage, block element.Block) {
-	if err := st.Insert(GetBlockHeightKey(block.Height), block.Hash); err != nil {
+	if err := st.Insert(GetBlockHeightKey(block.Header.Height), block.Hash); err != nil {
 		return
 	}
 }
 
 func OnAfterSaveTransaction(st storage.Storage, transaction element.Transaction, tx sebaktransaction.Transaction, block element.Block) {
-	if err := st.Insert(GetTransactionBlockKey(block.Height), transaction.Hash); err != nil {
+	if err := st.Insert(GetTransactionBlockKey(block.Header.Height), transaction.Hash); err != nil {
 		return
 	}
-	if err := st.Insert(GetTransactionSourceKey(transaction.Source, block.Height), transaction.Hash); err != nil {
+	if err := st.Insert(GetTransactionSourceKey(transaction.Source, block.Header.Height), transaction.Hash); err != nil {
 		return
 	}
 
 	for _, address := range transaction.AllAccounts() {
-		if err := st.Insert(GetTransactionAccountsKey(address, block.Height), transaction.Hash); err != nil {
+		if err := st.Insert(GetTransactionAccountsKey(address, block.Header.Height), transaction.Hash); err != nil {
 			return
 		}
 	}

@@ -91,6 +91,10 @@ func runDigest(dc *digestConfig) error {
 	}
 
 	potion := NewPotionByStorage(st)
+	if err := potion.Check(); err != nil {
+		log.Crit("failed to check storage", "storage", dc.Storage, "error", err)
+		return err
+	}
 
 	var provider sebak.StorageProvider
 	if len(dc.Digest.ImportFrom.Path) < 1 {

@@ -23,14 +23,14 @@ func NewBlock(b *element.Block) *Block {
 func (blk Block) GetMap() hal.Entry {
 	b := blk.b
 	return hal.Entry{
-		"version":              b.Version,
+		"version":              b.Header.Version,
 		"hash":                 b.Hash,
-		"height":               b.Height,
-		"prev_block_hash":      b.PrevBlockHash,
-		"transactions_root":    b.TransactionsRoot,
+		"height":               b.Header.Height,
+		"prev_block_hash":      b.Header.PrevBlockHash,
+		"transactions_root":    b.Header.TransactionsRoot,
 		"confirmed":            b.Confirmed,
 		"proposer":             b.Proposer,
-		"proposed_time":        b.ProposedTime,
+		"proposed_time":        b.Header.ProposedTime,
 		"proposer_transaction": b.ProposerTransaction,
 		"round":                b.Round,
 		"transactions":         b.Transactions,

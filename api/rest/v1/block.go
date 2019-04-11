@@ -45,22 +45,22 @@ func (h *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
 	rs.Links["self"] = hal.NewLink(strings.Replace(
 		sebakresource.URLBlocks,
 		"{id}",
-		strconv.FormatUint(block.Height, 10),
+		strconv.FormatUint(block.Header.Height, 10),
 		-1,
 	))
 
-	if block.Height != sebakcommon.GenesisBlockHeight {
+	if block.Header.Height != sebakcommon.GenesisBlockHeight {
 		rs.AddLink("prev", hal.NewLink(strings.Replace(
 			sebakresource.URLBlocks,
 			"{id}",
-			strconv.FormatUint(block.Height-1, 10),
+			strconv.FormatUint(block.Header.Height-1, 10),
 			-1,
 		)))
 	}
 	rs.AddLink("next", hal.NewLink(strings.Replace(
 		sebakresource.URLBlocks,
 		"{id}",
-		strconv.FormatUint(block.Height+1, 10),
+		strconv.FormatUint(block.Header.Height+1, 10),
 		-1,
 	)))
 

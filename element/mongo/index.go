@@ -26,13 +26,13 @@ var allIndexes = map[string][]mongo.IndexModel{
 			Keys: bson.M{"_v.header.prevblockhash": 1},
 			Options: mongooptions.Index().
 				SetUnique(true).
-				SetName("_naru_v0_block_header.prevblockhash"),
+				SetName("_naru_v0_block_header_prevblockhash"),
 		},
 		mongo.IndexModel{
 			Keys: bson.M{"_v.header.height": 1},
 			Options: mongooptions.Index().
 				SetUnique(true).
-				SetName("_naru_v0_block_header.height"),
+				SetName("_naru_v0_block_header_height"),
 		},
 		mongo.IndexModel{
 			Keys: bson.M{"_v.transactions": 1},

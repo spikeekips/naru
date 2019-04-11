@@ -1,7 +1,6 @@
 package graphqlapiv1
 
 import (
-	sebakcommon "boscoin.io/sebak/lib/common"
 	"github.com/graphql-go/graphql"
 
 	"github.com/spikeekips/naru/element"
@@ -53,7 +52,7 @@ var BlockType = graphql.NewObject(graphql.ObjectConfig{
 			},
 		},
 		"proposed_time": &graphql.Field{
-			Type: graphql.Int,
+			Type: graphql.DateTime,
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				block, err := getBlockBySource(p)
 				if err != nil {
@@ -161,7 +160,7 @@ var BlockType = graphql.NewObject(graphql.ObjectConfig{
 					return nil, err
 				}
 
-				return sebakcommon.ParseISO8601(block.Confirmed)
+				return block.Confirmed, nil
 			},
 		},
 	},

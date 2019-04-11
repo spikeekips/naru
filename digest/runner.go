@@ -126,27 +126,27 @@ func (d *InitializeDigestRunner) Run() (err error) {
 		}
 	}
 
-	if d.LastLocalBlock().Height < 1 {
+	if d.LastLocalBlock().Header.Height < 1 {
 		d.initialize = true
 	}
 
 	log.Debug(
 		"last blocks",
-		"local", d.LastLocalBlock().Height,
-		"remote", lastRemoteBlock.Height,
+		"local", d.LastLocalBlock().Header.Height,
+		"remote", lastRemoteBlock.Header.Height,
 		"initialize", d.initialize,
 	)
 
-	if d.LastLocalBlock().Height == lastRemoteBlock.Height {
+	if d.LastLocalBlock().Header.Height == lastRemoteBlock.Header.Height {
 		log.Debug(
 			"local block reached to the remote block",
-			"local", d.LastLocalBlock().Height,
-			"remote", lastRemoteBlock.Height,
+			"local", d.LastLocalBlock().Header.Height,
+			"remote", lastRemoteBlock.Header.Height,
 		)
 		return nil
 	}
 
-	var start, end uint64 = d.LastLocalBlock().Height, lastRemoteBlock.Height
+	var start, end uint64 = d.LastLocalBlock().Header.Height, lastRemoteBlock.Header.Height
 
 	var dg *Digest
 	dg, err = NewDigest(d.sst, d.potion, d.GenesisSource(), start, end, d.initialize, d.MaxWorkers, d.Blocks)
@@ -253,23 +253,23 @@ func (w *WatchDigestRunner) Run(force bool) error {
 
 	log.Debug(
 		"start WatchDigestRunner",
-		"start", startRemoteBlock.Height,
-		"remote", lastRemoteBlock.Height,
+		"start", startRemoteBlock.Header.Height,
+		"remote", lastRemoteBlock.Header.Height,
 	)
 
-	if startRemoteBlock.Height < lastRemoteBlock.Height { // follow up
-		if !force && lastRemoteBlock.Height-startRemoteBlock.Height >= farBlockHeight {
+	if startRemoteBlock.Header.Height < lastRemoteBlock.Header.Height { // follow up
+		if !force && lastRemoteBlock.Header.Height-startRemoteBlock.Header.Height >= farBlockHeight {
 			log.Error(
 				"local block is too far from the remote block",
 				"local", startRemoteBlock,
-				"remote", lastRemoteBlock.Height,
+				"remote", lastRemoteBlock.Header.Height,
 			)
 		}
 
-		go w.followup(startRemoteBlock.Height, lastRemoteBlock.Height-1)
+		go w.followup(startRemoteBlock.Header.Height, lastRemoteBlock.Header.Height-1)
 	}
 
-	w.watchLatestBlocks(lastRemoteBlock.Height)
+	w.watchLatestBlocks(lastRemoteBlock.Header.Height)
 
 	return nil
 }
@@ -326,20 +326,20 @@ func (w *WatchDigestRunner) watchLatestBlock(lastBlock uint64) error {
 		log.Error("failed to get last remote block", "error", err)
 		return err
 	}
-	if block.Height < lastBlock {
+	if block.Header.Height < lastBlock {
 		return nil
 	}
 
-	if block.Height == w.LastLocalBlock().Height {
+	if block.Header.Height == w.LastLocalBlock().Header.Height {
 		return nil
 	}
 
-	start := w.LastLocalBlock().Height
+	start := w.LastLocalBlock().Header.Height
 	if start < lastBlock {
 		start = lastBlock
 	}
 
-	db, err := NewDigest(w.sst, w.potion, w.GenesisSource(), start, block.Height, false, w.MaxWorkers, w.Blocks)
+	db, err := NewDigest(w.sst, w.potion, w.GenesisSource(), start, block.Header.Height, false, w.MaxWorkers, w.Blocks)
 	if err != nil {
 		log.Error("failed to open digest", "error", err)
 		return err
@@ -361,7 +361,7 @@ func (w *WatchDigestRunner) watchLatestBlock(lastBlock uint64) error {
 
 	{
 		st := w.potion.Storage()
-		st.Event("OnAfterDigest", w.potion, start, block.Height)
+		st.Event("OnAfterDigest", w.potion, start, block.Header.Height)
 	}
 
 	return nil
