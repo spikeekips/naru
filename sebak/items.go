@@ -11,68 +11,86 @@ import (
 	"github.com/spikeekips/naru/storage"
 )
 
-func GetBlockByHeight(s *Storage, height uint64) (block sebakblock.Block, err error) {
+func GetBlockByHeight(s *Storage, height uint64) (sebakblock.Block, error) {
 	// get last block
-	iterFunc, closeFunc := s.GetIterator(
+	iterFunc, closeFunc, err := s.Iterator(
 		sebakcommon.BlockPrefixHeight,
 		storage.NewDefaultListOptions(true, nil, 1),
 	)
-	it, _ := iterFunc()
-	closeFunc()
+	if err != nil {
+		return sebakblock.Block{}, err
+	}
+	defer closeFunc()
+
+	it, _, err := iterFunc()
+	if err != nil {
+		return sebakblock.Block{}, err
+	}
 	if len(it.Key) < 1 {
-		err = BlockNotFound.New()
-		return
+		return sebakblock.Block{}, BlockNotFound.New()
 	}
 
 	var key string
-	if _, err = s.Get(BlockHeightKey(height), &key); err != nil {
-		return
+	if _, err := s.Get(BlockHeightKey(height), &key); err != nil {
+		return sebakblock.Block{}, err
 	}
 
-	if _, err = s.Get(BlockHashKey(key), &block); err != nil {
+	var block sebakblock.Block
+	if _, err := s.Get(BlockHashKey(key), &block); err != nil {
 		log.Error("failed to get last block from sebak", "error", err)
-		return
+		return sebakblock.Block{}, err
 	}
 
-	return
+	return block, nil
 }
 
-func GetLastBlock(s *Storage) (block sebakblock.Block, err error) {
+func GetLastBlock(s *Storage) (sebakblock.Block, error) {
 	// get last block
-	iterFunc, closeFunc := s.GetIterator(
+	iterFunc, closeFunc, err := s.Iterator(
 		sebakcommon.BlockPrefixHeight,
 		storage.NewDefaultListOptions(true, nil, 1),
 	)
-	it, _ := iterFunc()
-	closeFunc()
+	if err != nil {
+		return sebakblock.Block{}, err
+	}
+	defer closeFunc()
+
+	it, _, err := iterFunc()
+	if err != nil {
+		return sebakblock.Block{}, err
+	}
+
 	if len(it.Key) < 1 {
-		err = BlockNotFound.New()
-		return
+		return sebakblock.Block{}, BlockNotFound.New()
 	}
 
 	var key string
-	if err = storage.Deserialize(it.Value, &key); err != nil {
+	if err := storage.Deserialize(it.Value, &key); err != nil {
 		log.Error("failed to parse last block key", "error", err)
-		return
+		return sebakblock.Block{}, err
 	}
 
-	if _, err = s.Get(BlockHashKey(key), &block); err != nil {
+	var block sebakblock.Block
+	if _, err := s.Get(BlockHashKey(key), &block); err != nil {
 		log.Error("failed to get last block from sebak", "error", err)
-		return
+		return sebakblock.Block{}, err
 	}
 
-	return
+	return block, nil
 }
 
 // Blocks returns iterator function and close function. It acts like
-// `GetIterator`, but instead of returning `sebakstorage.IterItem` it returns
+// `Iterator`, but instead of returning `sebakstorage.IterItem` it returns
 // `sebakblock.Block`.
 func GetBlocks(s *Storage, options storage.ListOptions) (func() (sebakblock.Block, bool), func()) {
-	itf, cf := s.GetIterator(sebakcommon.BlockPrefixHeight, options)
+	itf, cf, err := s.Iterator(sebakcommon.BlockPrefixHeight, options)
+	if err != nil {
+		return nil, nil
+	}
 
 	iterFunc := func() (sebakblock.Block, bool) {
-		it, next := itf()
-		if !next {
+		it, next, err := itf()
+		if err != nil || !next {
 			return sebakblock.Block{}, next
 		}
 
@@ -83,8 +101,7 @@ func GetBlocks(s *Storage, options storage.ListOptions) (func() (sebakblock.Bloc
 		}
 
 		var block sebakblock.Block
-		var err error
-		if _, err = s.Get(BlockHashKey(key), &block); err != nil {
+		if _, err := s.Get(BlockHashKey(key), &block); err != nil {
 			log.Error("failed to get block from sebak", "error", err)
 			return sebakblock.Block{}, false
 		}
@@ -135,11 +152,14 @@ func AccountKey(address string) string {
 }
 
 func GetAccounts(s *Storage, options storage.ListOptions) (func() (element.Account, bool), func()) {
-	itf, cf := s.GetIterator(sebakcommon.BlockAccountPrefixAddress, options)
+	itf, cf, err := s.Iterator(sebakcommon.BlockAccountPrefixAddress, options)
+	if err != nil {
+		return nil, nil
+	}
 
 	iterFunc := func() (element.Account, bool) {
-		it, next := itf()
-		if !next {
+		it, next, err := itf()
+		if err != nil || !next {
 			return element.Account{}, next
 		}
 

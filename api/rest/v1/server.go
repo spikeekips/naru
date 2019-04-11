@@ -35,13 +35,11 @@ func NewServer(nc *config.Network, sst *sebak.Storage, potion element.Potion, cb
 	nc.Log.HTTP.SetLogger(httpLog)
 
 	core := &http.Server{
-		Addr: nc.Bind.Host,
-		/* TODO from config
-		ReadTimeout:       config.ReadTimeout,
-		ReadHeaderTimeout: config.ReadHeaderTimeout,
-		WriteTimeout:      config.WriteTimeout,
-		*/
-		ErrorLog: goLog.New(rest.HTTP2ErrorLog15Writer{L: httpLog}, "", 0),
+		Addr:              nc.Bind.Host,
+		ReadTimeout:       nc.ReadTimeout,
+		ReadHeaderTimeout: nc.ReadHeaderTimeout,
+		WriteTimeout:      nc.WriteTimeout,
+		ErrorLog:          goLog.New(rest.HTTP2ErrorLog15Writer{L: httpLog}, "", 0),
 	}
 	core.SetKeepAlivesEnabled(true)
 

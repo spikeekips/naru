@@ -113,7 +113,7 @@ func (b *Storage) Get(k string, v interface{}) error {
 	return storage.Deserialize(o, v)
 }
 
-func (b *Storage) IteratorRaw(prefix string, options storage.ListOptions) (func() (storage.IterItem, bool), func()) {
+func (b *Storage) IteratorRaw(prefix string, options storage.ListOptions) (func() (storage.IterItem, bool, error), func(), error) {
 	var reverse = false
 	var cursor []byte
 	var limit uint64 = 0
@@ -156,7 +156,7 @@ func (b *Storage) IteratorRaw(prefix string, options storage.ListOptions) (func(
 	}
 
 	var n uint64 = 0
-	return func() (storage.IterItem, bool) {
+	return func() (storage.IterItem, bool, error) {
 			var next bool
 			if n == 0 {
 				next = seek()
@@ -168,35 +168,42 @@ func (b *Storage) IteratorRaw(prefix string, options storage.ListOptions) (func(
 
 			if limit != 0 && n > limit {
 				iter.Release()
-				return storage.IterItem{}, false
+				return storage.IterItem{}, false, nil
 			}
 
-			return storage.NewIterItemFromIterator(iter), next
+			return storage.NewIterItemFromIterator(iter), next, nil
 		},
 		func() {
 			iter.Release()
-		}
+		}, nil
 }
 
-func (b *Storage) Iterator(prefix string, v interface{}, options storage.ListOptions) (func() (storage.Record, bool), func()) {
-	iterFunc, closeFunc := b.IteratorRaw(prefix, options)
-	return func() (storage.Record, bool) {
-			item, next := iterFunc()
-			if !next {
-				return storage.Record{}, false
+func (b *Storage) Iterator(prefix string, v interface{}, options storage.ListOptions) (func() (storage.Record, bool, error), func(), error) {
+	iterFunc, closeFunc, err := b.IteratorRaw(prefix, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return func() (storage.Record, bool, error) {
+			item, next, err := iterFunc()
+			if err != nil {
+				return storage.Record{}, false, err
+			} else if !next {
+				return storage.Record{}, false, nil
 			}
 
 			nv := reflect.New(reflect.TypeOf(v)).Interface()
 			if err := storage.Deserialize(item.Value, nv); err != nil {
-				return storage.Record{}, false
+				return storage.Record{}, false, err
 			}
 
 			return storage.NewRecord(
 				string(item.Key),
 				reflect.ValueOf(nv).Elem().Interface(),
-			), next
+			), next, nil
 		},
-		closeFunc
+		closeFunc,
+		nil
 }
 
 func (b *Storage) Insert(k string, v interface{}) error {

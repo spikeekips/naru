@@ -5,7 +5,7 @@ type Storage interface {
 	Batch() (BatchStorage, error)
 	Has(string) (bool, error)
 	Get(string, interface{}) error
-	Iterator(string, interface{}, ListOptions) (func() (Record, bool /* has next */) /* close func */, func())
+	Iterator(string, interface{}, ListOptions) (func() (Record, bool /* has next */, error) /* close func */, func(), error)
 	Insert(string, interface{}) error
 	Update(string, interface{}) error
 	Delete(string) error

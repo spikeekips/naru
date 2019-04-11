@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 
 	sebakcommon "boscoin.io/sebak/lib/common"
 	"github.com/spikeekips/cvc"
@@ -15,9 +16,12 @@ import (
 
 type Network struct {
 	cvc.BaseGroup
-	Bind *sebakcommon.Endpoint `flag-help:"bind address"`
-	TLS  *TLSConfig
-	Log  *NetworkLogs
+	Bind              *sebakcommon.Endpoint `flag-help:"bind address"`
+	TLS               *TLSConfig
+	Log               *NetworkLogs
+	ReadTimeout       time.Duration
+	ReadHeaderTimeout time.Duration
+	WriteTimeout      time.Duration
 }
 
 type TLSConfig struct {
@@ -28,9 +32,12 @@ type TLSConfig struct {
 
 func NewNetwork() *Network {
 	return &Network{
-		Bind: common.DefaultBind,
-		TLS:  &TLSConfig{},
-		Log:  NewNetworkLogs(),
+		Bind:              common.DefaultBind,
+		TLS:               &TLSConfig{},
+		Log:               NewNetworkLogs(),
+		ReadTimeout:       time.Second * 10,
+		ReadHeaderTimeout: time.Second * 10,
+		WriteTimeout:      time.Second * 10,
 	}
 }
 

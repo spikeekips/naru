@@ -159,8 +159,7 @@ end:
 		}
 	}
 
-	// TODO remove
-	//d.logInsertedData()
+	d.logInsertedData()
 
 	ended := time.Now()
 	log_.Debug("digest done", "end", ended, "elapsed", ended.Sub(started))
@@ -205,8 +204,8 @@ func (d *Digest) digestBlocksByHeight(start, end uint64) error {
 
 	var blocks []element.Block
 	for {
-		blk, hasNext := iterFunc()
-		if !hasNext {
+		blk, next := iterFunc()
+		if !next {
 			break
 		}
 		if blk.Height > end {
@@ -290,15 +289,19 @@ func (d *Digest) logInsertedData() {
 	var blocks, transactions, internals, accounts uint64
 
 	{ // internals
-		iterFunc, closeFunc := d.potion.Storage().Iterator(
+		iterFunc, closeFunc, err := d.potion.Storage().Iterator(
 			element.InternalPrefix,
 			"",
 			storage.NewDefaultListOptions(false, nil, 0),
 		)
+		if err != nil {
+			return
+		}
+
 		defer closeFunc()
 
 		for {
-			if _, hasNext := iterFunc(); !hasNext {
+			if _, next, err := iterFunc(); err != nil || !next {
 				break
 			}
 			internals += 1
@@ -307,15 +310,18 @@ func (d *Digest) logInsertedData() {
 	}
 
 	{ // blocks
-		iterFunc, closeFunc := d.potion.Storage().Iterator(
+		iterFunc, closeFunc, err := d.potion.Storage().Iterator(
 			element.BlockPrefix,
 			element.Block{},
 			storage.NewDefaultListOptions(false, nil, 0),
 		)
+		if err != nil {
+			return
+		}
 		defer closeFunc()
 
 		for {
-			if _, hasNext := iterFunc(); !hasNext {
+			if _, next, err := iterFunc(); err != nil || !next {
 				break
 			}
 			blocks += 1
@@ -323,15 +329,18 @@ func (d *Digest) logInsertedData() {
 	}
 
 	{ // transactions
-		iterFunc, closeFunc := d.potion.Storage().Iterator(
+		iterFunc, closeFunc, err := d.potion.Storage().Iterator(
 			element.TransactionPrefix,
 			element.Transaction{},
 			storage.NewDefaultListOptions(false, nil, 0),
 		)
+		if err != nil {
+			return
+		}
 		defer closeFunc()
 
 		for {
-			if _, hasNext := iterFunc(); !hasNext {
+			if _, next, err := iterFunc(); err != nil || !next {
 				break
 			}
 			transactions += 1
@@ -339,15 +348,18 @@ func (d *Digest) logInsertedData() {
 	}
 
 	{ // accounts
-		iterFunc, closeFunc := d.potion.Storage().Iterator(
+		iterFunc, closeFunc, err := d.potion.Storage().Iterator(
 			element.AccountPrefix,
 			element.Account{},
 			storage.NewDefaultListOptions(false, nil, 0),
 		)
+		if err != nil {
+			return
+		}
 		defer closeFunc()
 
 		for {
-			if _, hasNext := iterFunc(); !hasNext {
+			if _, next, err := iterFunc(); err != nil || !next {
 				break
 			}
 			accounts += 1
@@ -355,7 +367,7 @@ func (d *Digest) logInsertedData() {
 	}
 
 	log.Debug(
-		"data inserted",
+		"digested",
 		"blocks", blocks,
 		"transactions", transactions,
 		"accounts", accounts,
@@ -371,8 +383,8 @@ func (d *Digest) saveAccounts(st storage.Storage, addresses ...string) error {
 		defer closeFunc()
 
 		for {
-			ac, hasNext := iterFunc()
-			if !hasNext {
+			ac, next := iterFunc()
+			if !next {
 				break
 			}
 			if err := ac.Save(st); err != nil {

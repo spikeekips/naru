@@ -37,7 +37,7 @@ func (b *Batch) Get(k string, v interface{}) error {
 	return b.s.Get(k, v)
 }
 
-func (b *Batch) Iterator(prefix string, v interface{}, options storage.ListOptions) (func() (storage.Record, bool), func()) {
+func (b *Batch) Iterator(prefix string, v interface{}, options storage.ListOptions) (func() (storage.Record, bool, error), func(), error) {
 	return b.s.Iterator(prefix, v, options)
 }
 

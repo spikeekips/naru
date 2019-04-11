@@ -55,6 +55,5 @@ func (t Transaction) Resource() *hal.Resource {
 }
 
 func (t Transaction) LinkSelf() string {
-	// TODO support FQDN
 	return strings.Replace(sebakresource.URLTransactions, "{id}", t.tx.Hash, -1)
 }

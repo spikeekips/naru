@@ -19,7 +19,7 @@ type StorageProvider interface {
 	New() StorageProvider
 	Has(string) (bool, error)
 	Get(string) ([]byte, error)
-	GetIterator(string, storage.ListOptions) (func() (storage.IterItem, bool), func())
+	Iterator(string, storage.ListOptions) (func() (storage.IterItem, bool, error), func(), error)
 }
 
 type JSONRPCStorageProvider struct {
@@ -71,7 +71,7 @@ func (j *JSONRPCStorageProvider) request(method string, args interface{}, result
 
 func (j *JSONRPCStorageProvider) Open() error {
 	if len(j.getSnapshot()) > 0 {
-		return ProviderNotClosedError
+		return ProviderNotClosedError.New()
 	}
 
 	var result sebakrunner.DBOpenSnapshotResult
@@ -86,7 +86,7 @@ func (j *JSONRPCStorageProvider) Open() error {
 
 func (j *JSONRPCStorageProvider) Close() error {
 	if len(j.getSnapshot()) < 1 {
-		return ProviderNotOpenedError
+		return ProviderNotOpenedError.New()
 	}
 
 	var result sebakrunner.DBReleaseSnapshotResult
@@ -112,7 +112,7 @@ func (j *JSONRPCStorageProvider) New() StorageProvider {
 
 func (j *JSONRPCStorageProvider) Has(key string) (bool, error) {
 	if len(j.getSnapshot()) < 1 {
-		return false, ProviderNotOpenedError
+		return false, ProviderNotOpenedError.New()
 	}
 
 	var result sebakrunner.DBHasResult
@@ -126,7 +126,7 @@ func (j *JSONRPCStorageProvider) Has(key string) (bool, error) {
 
 func (j *JSONRPCStorageProvider) Get(key string) ([]byte, error) {
 	if len(j.getSnapshot()) < 1 {
-		return nil, ProviderNotOpenedError
+		return nil, ProviderNotOpenedError.New()
 	}
 
 	var result sebakrunner.DBGetResult
@@ -138,19 +138,20 @@ func (j *JSONRPCStorageProvider) Get(key string) ([]byte, error) {
 	return result.Value, nil
 }
 
-func (j *JSONRPCStorageProvider) GetIterator(prefix string, options storage.ListOptions) (func() (storage.IterItem, bool), func()) {
-	nullIterFunc := func() (storage.IterItem, bool) {
-		return storage.IterItem{}, false
+func (j *JSONRPCStorageProvider) Iterator(prefix string, options storage.ListOptions) (func() (storage.IterItem, bool, error), func(), error) {
+	nullIterFunc := func() (storage.IterItem, bool, error) {
+		return storage.IterItem{}, false, nil
 	}
 	nullCloseFunc := func() {}
 
 	if len(j.getSnapshot()) < 1 {
-		return nullIterFunc, nullCloseFunc
+		return nullIterFunc, nullCloseFunc, ProviderNotOpenedError.New()
+
 	}
 
 	dbGetIterator := func(options storage.ListOptions) (uint64, []storage.IterItem, error) {
 		if len(j.getSnapshot()) < 1 {
-			return 0, nil, ProviderNotOpenedError
+			return 0, nil, ProviderNotOpenedError.New()
 		}
 
 		args := sebakrunner.DBGetIteratorArgs{
@@ -180,15 +181,15 @@ func (j *JSONRPCStorageProvider) GetIterator(prefix string, options storage.List
 
 	var all int
 	var n int
-	var iterFunc func() (storage.IterItem, bool)
-	iterFunc = func() (storage.IterItem, bool) {
+	var iterFunc func() (storage.IterItem, bool, error)
+	iterFunc = func() (storage.IterItem, bool, error) {
 		if closed {
-			return storage.IterItem{}, false
+			return storage.IterItem{}, false, nil
 		}
 
 		if options.Limit() > 0 && uint64(all) >= options.Limit() {
 			closed = true
-			return storage.IterItem{}, false
+			return storage.IterItem{}, false, nil
 		}
 
 		if items == nil {
@@ -198,21 +199,21 @@ func (j *JSONRPCStorageProvider) GetIterator(prefix string, options storage.List
 		}
 
 		if err != nil {
-			log.Error("failed GetIterator", "error", err)
-			return storage.IterItem{}, false
+			log.Error("failed Iterator", "error", err)
+			return storage.IterItem{}, false, err
 		}
 		if len(items) == 0 {
-			return storage.IterItem{}, false
+			return storage.IterItem{}, false, nil
 		}
 		if len(items) >= n+1 {
 			defer func() {
 				n += 1
 				all += 1
 			}()
-			return items[n], true
+			return items[n], true, nil
 		}
 		if int(limit) > len(items) {
-			return storage.IterItem{}, false
+			return storage.IterItem{}, false, nil
 		}
 
 		if len(items) > 0 {
@@ -223,9 +224,10 @@ func (j *JSONRPCStorageProvider) GetIterator(prefix string, options storage.List
 		return iterFunc()
 	}
 
-	return iterFunc, func() {
-		closed = true
-	}
+	return iterFunc,
+		func() {
+			closed = true
+		}, nil
 }
 
 type LocalStorageProvider struct {
@@ -256,6 +258,6 @@ func (j *LocalStorageProvider) Get(key string) ([]byte, error) {
 	return j.s.GetRaw(key)
 }
 
-func (j *LocalStorageProvider) GetIterator(prefix string, options storage.ListOptions) (func() (storage.IterItem, bool), func()) {
+func (j *LocalStorageProvider) Iterator(prefix string, options storage.ListOptions) (func() (storage.IterItem, bool, error), func(), error) {
 	return j.s.IteratorRaw(prefix, options)
 }

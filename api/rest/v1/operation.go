@@ -32,7 +32,6 @@ func (g OperationsByAccountStreamHandler) NewRequest(base BaseStreamHandler) (St
 }
 
 func (g *OperationsByAccountStreamHandler) Init() <-chan interface{} {
-	// TODO
 	lo := g.query.ListOptions()
 	iterFunc, closeFunc := g.H.potion.OperationsByAccount(
 		g.address,
@@ -46,8 +45,8 @@ func (g *OperationsByAccountStreamHandler) Init() <-chan interface{} {
 		defer close(ch)
 
 		for {
-			op, hasNext, _ := iterFunc()
-			if !hasNext {
+			op, next, _ := iterFunc()
+			if !next {
 				break
 			}
 

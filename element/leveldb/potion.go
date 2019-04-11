@@ -105,10 +105,17 @@ func (g Potion) BlockByHeight(height uint64) (element.Block, error) {
 
 func (g Potion) LastBlock() (element.Block, error) {
 	options := storage.NewDefaultListOptions(true, nil, 1)
-	iterFunc, closeFunc := g.s.Iterator(BlockHeightPrefix, "", options)
-	i, hasNext := iterFunc()
+	iterFunc, closeFunc, err := g.s.Iterator(BlockHeightPrefix, "", options)
+	if err != nil {
+		return element.Block{}, err
+	}
+
+	i, next, err := iterFunc()
 	closeFunc()
-	if !hasNext {
+	if err != nil {
+		return element.Block{}, err
+	}
+	if !next {
 		return element.Block{}, sebakerrors.StorageRecordDoesNotExist
 	}
 
@@ -124,15 +131,19 @@ func (g Potion) BlocksByHeight(start, end uint64) (
 	func() (element.Block, bool, []byte),
 	func(),
 ) {
-	iterFunc, closeFunc := g.Storage().Iterator(
+	iterFunc, closeFunc, err := g.Storage().Iterator(
 		BlockHeightPrefix,
 		"",
 		storage.NewDefaultListOptions(false, []byte(GetBlockHeightKey(start)), 0),
 	)
 
+	if err != nil {
+		return nil, nil
+	}
+
 	return (func() (element.Block, bool, []byte) {
-			it, hasNext := iterFunc()
-			if !hasNext {
+			it, next, err := iterFunc()
+			if err != nil || !next {
 				return element.Block{}, false, []byte{}
 			}
 
@@ -146,7 +157,7 @@ func (g Potion) BlocksByHeight(start, end uint64) (
 				return element.Block{}, false, []byte{}
 			}
 
-			return b, hasNext, nil
+			return b, next, nil
 		}), (func() {
 			closeFunc()
 		})
@@ -161,11 +172,14 @@ func (g Potion) OperationsByAccount(address string, options storage.ListOptions)
 	func() (element.Operation, bool, []byte),
 	func(),
 ) {
-	iterFunc, closeFunc := g.s.Iterator(fmt.Sprintf("%s%s", element.OperationAccountRelatedPrefix, address), "", options)
+	iterFunc, closeFunc, err := g.s.Iterator(fmt.Sprintf("%s%s", element.OperationAccountRelatedPrefix, address), "", options)
+	if err != nil {
+		return nil, nil
+	}
 
 	return (func() (element.Operation, bool, []byte) {
-			it, hasNext := iterFunc()
-			if !hasNext {
+			it, next, err := iterFunc()
+			if err != nil || !next {
 				return element.Operation{}, false, []byte(it.Key)
 			}
 
@@ -179,7 +193,7 @@ func (g Potion) OperationsByAccount(address string, options storage.ListOptions)
 				return element.Operation{}, false, []byte(it.Key)
 			}
 
-			return o, hasNext, []byte(it.Key)
+			return o, next, []byte(it.Key)
 		}), (func() {
 			closeFunc()
 		})

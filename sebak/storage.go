@@ -41,6 +41,6 @@ func (s *Storage) Get(key string, i interface{}) ([]byte, error) {
 	return b, storage.Deserialize(b, i)
 }
 
-func (s *Storage) GetIterator(prefix string, options storage.ListOptions) (func() (storage.IterItem, bool), func()) {
-	return s.provider.GetIterator(prefix, options)
+func (s *Storage) Iterator(prefix string, options storage.ListOptions) (func() (storage.IterItem, bool, error), func(), error) {
+	return s.provider.Iterator(prefix, options)
 }

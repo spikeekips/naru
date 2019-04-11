@@ -164,7 +164,7 @@ func (b *Storage) Get(k string, v interface{}) error {
 	return err
 }
 
-func (b *Storage) Iterator(prefix string, v interface{}, opt storage.ListOptions) (func() (storage.Record, bool), func()) {
+func (b *Storage) Iterator(prefix string, v interface{}, opt storage.ListOptions) (func() (storage.Record, bool, error), func(), error) {
 	q := bson.M{"_k": bson.M{"$regex": "^" + regexp.QuoteMeta(prefix)}}
 
 	reverse := 1
@@ -194,35 +194,35 @@ func (b *Storage) Iterator(prefix string, v interface{}, opt storage.ListOptions
 
 	col, err := b.Collection(prefix)
 	if err != nil {
-		return nil, nil
+		return nil, nil, err
 	}
 
 	cur, err := col.Find(context.Background(), q, mopt)
-	return func() (storage.Record, bool) {
-			// TODO err should be returned
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return func() (storage.Record, bool, error) {
 			if err != nil {
-				return storage.Record{}, false
+				return storage.Record{}, false, nil
 			}
 
-			hasNext := cur.Next(context.Background())
-			if !hasNext {
-				return storage.Record{}, false
+			next := cur.Next(context.Background())
+			if !next {
+				return storage.Record{}, false, nil
 			}
 
 			nv := reflect.New(reflect.TypeOf(v)).Interface()
 			doc, err := UnmarshalDocument([]byte(cur.Current), nv)
 			if err != nil {
-				return storage.Record{}, false
+				return storage.Record{}, false, err
 			}
 
-			return storage.NewRecord(doc.K, reflect.ValueOf(nv).Elem().Interface()), true
+			return storage.NewRecord(doc.K, reflect.ValueOf(nv).Elem().Interface()), true, nil
 		}, func() {
-			if err != nil {
-				return
-			}
-
 			cur.Close(context.Background())
-		}
+		},
+		nil
 }
 
 func (b *Storage) Insert(k string, v interface{}) error {

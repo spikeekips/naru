@@ -97,7 +97,6 @@ var BlockType = graphql.NewObject(graphql.ObjectConfig{
 			},
 		},
 		"transaction_hashes": &graphql.Field{
-			// TODO should be TransactionType
 			Type: graphql.NewList(graphql.String),
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				block, err := getBlockBySource(p)
@@ -109,7 +108,6 @@ var BlockType = graphql.NewObject(graphql.ObjectConfig{
 			},
 		},
 		"transactions": &graphql.Field{
-			// TODO should be TransactionType
 			Type: graphql.NewList(TransactionType),
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				block, err := getBlockBySource(p)
@@ -138,7 +136,6 @@ var BlockType = graphql.NewObject(graphql.ObjectConfig{
 			},
 		},
 		"proposer_transaction_hash": &graphql.Field{
-			// TODO should be TransactionType
 			Type: graphql.String,
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				block, err := getBlockBySource(p)

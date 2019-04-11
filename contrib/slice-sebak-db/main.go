@@ -91,8 +91,8 @@ func removeBlock(hash string, chanError chan<- error) (err error) {
 		sebakstorage.NewDefaultListOptions(false, nil, 0),
 	)
 	for {
-		item, hasNext := iterFunc()
-		if !hasNext {
+		item, next := iterFunc()
+		if !next {
 			break
 		}
 		if err = st.Remove(string(item.Key)); err != nil {
@@ -153,10 +153,10 @@ func main() {
 		)
 
 		var item sebakstorage.IterItem
-		var hasNext bool
+		var next bool
 		for {
-			item, hasNext = iterFunc()
-			if !hasNext {
+			item, next = iterFunc()
+			if !next {
 				break
 			}
 
@@ -203,8 +203,8 @@ end:
 
 	var countMissing int
 	for {
-		item, hasNext := iterFunc()
-		if !hasNext {
+		item, next := iterFunc()
+		if !next {
 			break
 		}
 		var hash string

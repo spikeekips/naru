@@ -13,11 +13,11 @@ import (
 )
 
 type FakeSEBAKStorageProvider struct {
-	OpenError        error
-	CloseError       error
-	HasError         error
-	GetError         error
-	GetIteratorError error
+	OpenError     error
+	CloseError    error
+	HasError      error
+	GetError      error
+	IteratorError error
 
 	items    []sebakstorage.IterItem
 	itemsMap map[string]sebakstorage.IterItem
@@ -81,9 +81,9 @@ func (f *FakeSEBAKStorageProvider) Get(key string) ([]byte, error) {
 	return item.Value, nil
 }
 
-func (f *FakeSEBAKStorageProvider) GetIterator(prefix string, options sebakstorage.ListOptions) (uint64, []sebakstorage.IterItem, error) {
-	if f.GetIteratorError != nil {
-		return 0, nil, f.GetIteratorError
+func (f *FakeSEBAKStorageProvider) Iterator(prefix string, options sebakstorage.ListOptions) (uint64, []sebakstorage.IterItem, error) {
+	if f.IteratorError != nil {
+		return 0, nil, f.IteratorError
 	}
 
 	var limit uint64
@@ -219,19 +219,19 @@ func (t *testSuiteSEBAKStorageProvider) TestGetError() {
 	t.Equal(p.GetError, err)
 }
 
-func (t *testSuiteSEBAKStorageProvider) TestGetIterator() {
+func (t *testSuiteSEBAKStorageProvider) TestIterator() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
 
 	st := NewStorage(p)
 
-	iterFunc, closeFunc := st.GetIterator("", sebakstorage.NewDefaultListOptions(false, nil, uint64(len(p.Items()))))
+	iterFunc, closeFunc := st.Iterator("", sebakstorage.NewDefaultListOptions(false, nil, uint64(len(p.Items()))))
 	defer closeFunc()
 
 	var items []sebakstorage.IterItem
 	for {
-		item, hasNext := iterFunc()
-		if !hasNext {
+		item, next := iterFunc()
+		if !next {
 			break
 		}
 
@@ -247,35 +247,35 @@ func (t *testSuiteSEBAKStorageProvider) TestGetIterator() {
 	}
 }
 
-func (t *testSuiteSEBAKStorageProvider) TestGetIteratorCloseFunc() {
+func (t *testSuiteSEBAKStorageProvider) TestIteratorCloseFunc() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
 
 	st := NewStorage(p)
 
-	iterFunc, closeFunc := st.GetIterator("", sebakstorage.NewDefaultListOptions(false, nil, uint64(len(p.Items()))))
+	iterFunc, closeFunc := st.Iterator("", sebakstorage.NewDefaultListOptions(false, nil, uint64(len(p.Items()))))
 
 	iterFunc()
 	closeFunc()
-	item, hasNext := iterFunc()
+	item, next := iterFunc()
 
 	t.Empty(item)
-	t.False(hasNext)
+	t.False(next)
 }
 
-func (t *testSuiteSEBAKStorageProvider) TestGetIteratorReverse() {
+func (t *testSuiteSEBAKStorageProvider) TestIteratorReverse() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
 
 	st := NewStorage(p)
 
-	iterFunc, closeFunc := st.GetIterator("", sebakstorage.NewDefaultListOptions(true, nil, uint64(len(p.Items()))))
+	iterFunc, closeFunc := st.Iterator("", sebakstorage.NewDefaultListOptions(true, nil, uint64(len(p.Items()))))
 	defer closeFunc()
 
 	var items []sebakstorage.IterItem
 	for {
-		item, hasNext := iterFunc()
-		if !hasNext {
+		item, next := iterFunc()
+		if !next {
 			break
 		}
 
@@ -291,35 +291,35 @@ func (t *testSuiteSEBAKStorageProvider) TestGetIteratorReverse() {
 	}
 }
 
-func (t *testSuiteSEBAKStorageProvider) TestGetIteratorError() {
+func (t *testSuiteSEBAKStorageProvider) TestIteratorError() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
-	p.GetIteratorError = fmt.Errorf("something wrong")
+	p.IteratorError = fmt.Errorf("something wrong")
 
 	st := NewStorage(p)
 
-	iterFunc, closeFunc := st.GetIterator("", sebakstorage.NewDefaultListOptions(true, nil, uint64(len(p.Items()))))
+	iterFunc, closeFunc := st.Iterator("", sebakstorage.NewDefaultListOptions(true, nil, uint64(len(p.Items()))))
 	defer closeFunc()
 
-	item, hasNext := iterFunc()
+	item, next := iterFunc()
 	t.Empty(item)
-	t.False(hasNext)
+	t.False(next)
 }
 
-func (t *testSuiteSEBAKStorageProvider) TestGetIteratorLimit() {
+func (t *testSuiteSEBAKStorageProvider) TestIteratorLimit() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
 
 	st := NewStorage(p)
 
 	limit := 3
-	iterFunc, closeFunc := st.GetIterator("", sebakstorage.NewDefaultListOptions(false, nil, uint64(limit)))
+	iterFunc, closeFunc := st.Iterator("", sebakstorage.NewDefaultListOptions(false, nil, uint64(limit)))
 	defer closeFunc()
 
 	var items []sebakstorage.IterItem
 	for {
-		item, hasNext := iterFunc()
-		if !hasNext {
+		item, next := iterFunc()
+		if !next {
 			break
 		}
 
@@ -335,20 +335,20 @@ func (t *testSuiteSEBAKStorageProvider) TestGetIteratorLimit() {
 	}
 }
 
-func (t *testSuiteSEBAKStorageProvider) TestGetIteratorLimitReverse() {
+func (t *testSuiteSEBAKStorageProvider) TestIteratorLimitReverse() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
 
 	st := NewStorage(p)
 
 	limit := 3
-	iterFunc, closeFunc := st.GetIterator("", sebakstorage.NewDefaultListOptions(true, nil, uint64(limit)))
+	iterFunc, closeFunc := st.Iterator("", sebakstorage.NewDefaultListOptions(true, nil, uint64(limit)))
 	defer closeFunc()
 
 	var items []sebakstorage.IterItem
 	for {
-		item, hasNext := iterFunc()
-		if !hasNext {
+		item, next := iterFunc()
+		if !next {
 			break
 		}
 
@@ -364,20 +364,20 @@ func (t *testSuiteSEBAKStorageProvider) TestGetIteratorLimitReverse() {
 	}
 }
 
-func (t *testSuiteSEBAKStorageProvider) TestGetIteratorOverLimit() {
+func (t *testSuiteSEBAKStorageProvider) TestIteratorOverLimit() {
 	p := newFakeSEBAKStorageProvider()
 	p.SetItems(t.makeItems(5))
 	p.Limit = 3
 
 	st := NewStorage(p)
 
-	iterFunc, closeFunc := st.GetIterator("", sebakstorage.NewDefaultListOptions(false, nil, 1000))
+	iterFunc, closeFunc := st.Iterator("", sebakstorage.NewDefaultListOptions(false, nil, 1000))
 	defer closeFunc()
 
 	var items []sebakstorage.IterItem
 	for {
-		item, hasNext := iterFunc()
-		if !hasNext {
+		item, next := iterFunc()
+		if !next {
 			break
 		}
 
